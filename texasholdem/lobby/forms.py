@@ -32,6 +32,10 @@ class GameTypeSelectionForm(forms.Form):
         return cleaned_data
 
 
+class GameJoinIdForm(forms.Form):
+    join_game_id = forms.CharField(required=True)
+
+
 class GamePrivacySettingsForm(forms.Form):
     privacy = forms.ChoiceField(
         choices=(('public', 'Public'), ('private', 'Private')), required=True)

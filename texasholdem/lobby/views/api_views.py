@@ -11,7 +11,12 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 
 from lobby.models import Game, Player
-from lobby.forms import NewConnectQuatroRoomForm, GameTypeSelectionForm, GamePrivacySettingsForm
+from lobby.forms import (
+    NewConnectQuatroRoomForm,
+    GameTypeSelectionForm,
+    GamePrivacySettingsForm,
+    GameJoinIdForm,
+)
 from lobby import lib as lobby_lib
 from connectquatro import lib as cq_lib
 from connectquatro.models import Board as CQboard
@@ -140,12 +145,11 @@ def join_lobby(request, slug):
             "game is over", status.HTTP_400_BAD_REQUEST)
     
     if not game.is_public:
-        join_game_id = request.data.get("join_game_id")
-        if not join_game_id:
-            return Response(
-                "join_game_id is required for private game",
-                status.HTTP_400_BAD_REQUEST)
-        
+        join_id_form = GameJoinIdForm(request.data)
+        if not join_id_form.is_valid():
+            return Response(join_id_form.errors, status.HTTP_400_BAD_REQUEST)
+
+        join_game_id = join_id_form.cleaned_data["join_game_id"]
         if join_game_id != game.join_game_id:
             return Response(
                 "invalid join_game_id", status.HTTP_400_BAD_REQUEST)
