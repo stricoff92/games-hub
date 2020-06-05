@@ -2,11 +2,11 @@
 <div 
     id="player-chats"
     class="card"
-    style="position:fixed; bottom:10px; width:60%; z-index:10;"
+    style="position:fixed; bottom:6px; width:60%; z-index:10;"
 >
     <div 
         id="chat-title-bar"
-        class="card-header bg-primary text-white p-0 pl-2"
+        class="card-header bg-primary text-white p-1 pl-2"
         style="display:flex;justify-content:space-between;"
     >
         <span>
@@ -59,7 +59,7 @@
     }
     $("#chat-title-bar").click(e => {
         const openClasses = ['p-2']
-        const closedClasses = ['pt-0', 'pb-0', 'pl-2']
+        const closedClasses = ['pt-1', 'pb-1', 'pl-2']
         if (chatWindowOpen()) {
             // Close chat window.
             $("#player-chats-inner-container").css("display", "none")
