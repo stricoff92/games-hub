@@ -4,6 +4,7 @@ from .page_views import login_page
 from .page_views import login_redirect
 from .page_views import logout_page
 from .page_views import register
+from .page_views import lobby_join_with_join_game_id
 
 from .api_views import create_lobby
 from .api_views import start_game

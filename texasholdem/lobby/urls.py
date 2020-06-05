@@ -15,6 +15,8 @@ urlpatterns = [
     url(r"^lobby/logout/?$", views.logout_page, name='page-lobby-logout'),
     url(r"^lobby/login/success/?$", views.login_redirect, name='page-lobby-login-redirect'),
     url(r"^lobby/game/(?P<slug>[0-9a-zA-Z]+)/", views.game_lobby_page, name='page-game-lobby'),
+    url(r"^lobby/join/(?P<join_game_id>[0-9a-zA-Z]+)/", views.lobby_join_with_join_game_id, name='page-join-by-id'),
+
 
     # API Routes.
     url(r"api/lobby/create/?$", views.create_lobby, name='api-lobby-create'),

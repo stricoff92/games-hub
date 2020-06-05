@@ -41,6 +41,17 @@
                         <input type="text" class="ml-2" name="roomname" placeholder="ex: {{ example_name }}">
                     </p>
                     <p>
+                        Privacy
+                        <select id="room-privacy-selection" class="ml-3" name="privacy">
+                            <option value="public" class="game-privacy-option">
+                                Game is Public
+                            </option>
+                            <option value="private" class="game-privacy-option">
+                                Game is Private
+                            </option>
+                        </select>
+                    </p>
+                    <p>
                         Room Type
                         <select id="room-type-selection" class="ml-3" name="roomtype">
                             {% for game_type in game_types %}

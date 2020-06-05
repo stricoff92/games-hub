@@ -24,6 +24,12 @@
         <div style="display:flex;justify-content:center;">
             <h1 style="font-size:2rem;">{{ game_type }}</h1>
         </div>
+        <div>
+            Join Link
+            <a id="join-game-url-link" href="{{ game.join_game_page_url }}" class="ml-2" style="color:#b3d1ff;">
+                {{ game.join_game_page_url }}
+            </a>
+        </div>
     </div>
 
     <div class="card" style="display:none;" id="fade-in-container-1">
@@ -178,6 +184,12 @@
                 }
             }
         })
+    })
+
+    $(document).ready(() => {
+        const path = $("#join-game-url-link").text()
+        const fullPath = location.origin + path
+        $("#join-game-url-link").text(fullPath)
     })
 
 </script>

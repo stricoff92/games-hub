@@ -74,7 +74,7 @@ class TestLobbyTest(APITestCase):
         self.assertTrue(game2.slug in returned_slugs)
 
 
-    def test_player_can_create_a_game(self):
+    def test_player_can_create_a_public_game(self):
         """ Test player can create a game.
         """
         self.client.login(username='testuser1@mail.com', password='password')
@@ -85,6 +85,7 @@ class TestLobbyTest(APITestCase):
             'boarddimy':9,
             'boardplayercount':2,
             'boardwincount':5,
+            'privacy':'public',
         }
         url = reverse('api-lobby-create')
         response = self.client.post(url, data, format="json")
@@ -96,23 +97,68 @@ class TestLobbyTest(APITestCase):
         self.assertEqual(game.players.first(), self.player1)
         self.assertEqual(game.name, 'foo0 barR')
         self.assertEqual(game.game_type, Game.GAME_TYPE_CHOICE_CONNECT_QUAT)
+        self.assertTrue(game.is_public)
         self.assertEqual(self.player1.game, game)
         self.assertTrue(self.player1.is_lobby_owner)
         self.assertEqual(game.max_players, 2)
         self.assertEqual(board.max_to_win, 5)
         self.assertEqual(board.board_length_x, 8)
         self.assertEqual(board.board_length_y, 9)
+        self.assertIsNotNone(game.join_game_id)
 
         # test socket event fires
         self.mock_update_lobby_list_add_connect_quatro.assert_called_once_with(game, board)
+
+    def test_player_can_create_a_private_game(self):
+        """ Test player can create private a game.
+        """
+        self.client.login(username='testuser1@mail.com', password='password')
+        data = {
+            'roomtype':Game.GAME_TYPE_CHOICE_CONNECT_QUAT,
+            'roomname':'foo0 barR',
+            'boarddimx':8,
+            'boarddimy':9,
+            'boardplayercount':2,
+            'boardwincount':5,
+            'privacy':'private',
+        }
+        url = reverse('api-lobby-create')
+        response = self.client.post(url, data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        game = Game.objects.get(id=response.data['id'])
+        board = Board.objects.get(game=game)
+        self.player1.refresh_from_db()
+    
+        self.assertEqual(game.players.count(), 1)
+        self.assertEqual(game.players.first(), self.player1)
+        self.assertEqual(game.name, 'foo0 barR')
+        self.assertEqual(game.game_type, Game.GAME_TYPE_CHOICE_CONNECT_QUAT)
+        self.assertFalse(game.is_public)
+        self.assertEqual(game.max_players, 2)
+        self.assertIsNotNone(game.join_game_id)
+
+        self.assertEqual(self.player1.game, game)
+        self.assertTrue(self.player1.is_lobby_owner)
+
+        self.assertEqual(board.max_to_win, 5)
+        self.assertEqual(board.board_length_x, 8)
+        self.assertEqual(board.board_length_y, 9)
+        
+        self.mock_update_lobby_list_add_connect_quatro.assert_not_called()
 
 
     def test_anonymous_player_cannot_create_a_game(self):
         """ Test anon user cannot create a game.
         """
         data = {
-            'game_type':Game.GAME_TYPE_CHOICE_CONNECT_QUAT,
-            'name':'foo0 barR',
+            'roomtype':Game.GAME_TYPE_CHOICE_CONNECT_QUAT,
+            'roomname':'foo0 barR',
+            'boarddimx':8,
+            'boarddimy':9,
+            'boardplayercount':2,
+            'boardwincount':5,
+            'privacy':'public',
         }
         url = reverse('api-lobby-create')
         response = self.client.post(url, data, format="json")
@@ -129,8 +175,13 @@ class TestLobbyTest(APITestCase):
         self.player1.save(update_fields=['game'])
 
         data = {
-            'game_type':Game.GAME_TYPE_CHOICE_CONNECT_QUAT,
-            'name':'foo0 barR',
+            'roomtype':Game.GAME_TYPE_CHOICE_CONNECT_QUAT,
+            'roomname':'foo0 barR',
+            'boarddimx':8,
+            'boarddimy':9,
+            'boardplayercount':2,
+            'boardwincount':5,
+            'privacy':'public',
         }
         url = reverse('api-lobby-create')
         response = self.client.post(url, data, format="json")
@@ -373,7 +424,72 @@ class TestLobbyTest(APITestCase):
         response = self.client.post(url, {}, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_player_cant_join_pirvate_game_with_no_join_id_or_invalid_join_id(self):
+        """ Test player cant join a private game without a join id
+        """
+        self.user2 = User.objects.create_user('testuser2@mail.com', password='password')
+        self.player2 = Player.objects.create(user=self.user2, handle="foobar")
+        other_game = Game.objects.create(
+            game_type=Game.GAME_TYPE_CHOICE_CONNECT_QUAT, name="foo", is_started=False, is_public=False,
+            join_game_id="12345678", max_players=3)
 
+        self.player1.game = other_game
+        self.player1.save(update_fields=['game'])
+
+        self.client.login(username='testuser2@mail.com', password='password')
+        url = reverse('api-lobby-join', kwargs={'slug':other_game.slug})
+
+        # Missing join id
+        response = self.client.post(url, {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue("join_game_id is required for private game" in response.data)
+
+        # Invalid join id
+        response = self.client.post(url, {'join_game_id':'gggggggg'}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue("invalid join_game_id" in response.data)
+
+    def test_player_can_join_pirvate_game_with_join_id(self):
+        """ Test player can join game with a join id
+        """
+        self.user2 = User.objects.create_user('testuser2@mail.com', password='password')
+        self.player2 = Player.objects.create(user=self.user2, handle="foobar")
+
+        other_game = Game.objects.create(
+            game_type=Game.GAME_TYPE_CHOICE_CONNECT_QUAT, name="foo", is_started=False, is_public=False,
+            join_game_id="12345678", max_players=3)
+        self.player1.game = other_game
+        self.player1.save(update_fields=['game'])
+
+        self.client.login(username='testuser2@mail.com', password='password')
+        url = reverse('api-lobby-join', kwargs={'slug':other_game.slug})
+        response = self.client.post(url, {'join_game_id':'12345678'}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        self.player2.refresh_from_db()
+        self.assertEqual(self.player2.game, other_game)
+
+    def test_lobby_list_not_updated_when_user_joins_private_lobby(self):
+        """ Test lobby list isnt updated when a player joins a private lobby
+        """
+        self.user2 = User.objects.create_user('testuser2@mail.com', password='password')
+        self.player2 = Player.objects.create(user=self.user2, handle="foobar")
+
+        other_game = Game.objects.create(
+            game_type=Game.GAME_TYPE_CHOICE_CONNECT_QUAT, name="foo", is_started=False, is_public=False,
+            join_game_id="12345678", max_players=3)
+        self.player1.game = other_game
+        self.player1.save(update_fields=['game'])
+
+        self.client.login(username='testuser2@mail.com', password='password')
+        url = reverse('api-lobby-join', kwargs={'slug':other_game.slug})
+        response = self.client.post(url, {'join_game_id':'12345678'}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.mock_update_lobby_list_remove_game.assert_not_called()
+        self.mock_update_lobby_list_player_count.assert_not_called()
+
+ 
     def test_player_can_leave_a_game_lobby_that_was_full_and_not_Started(self):
         """ Test player can leave a not started game what was full
             

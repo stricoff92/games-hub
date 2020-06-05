@@ -56,6 +56,19 @@ def game_lobby_page(request, slug):
         }
         return render(request, "game_lobby.html", data)
 
+@login_required
+def lobby_join_with_join_game_id(request, join_game_id):
+    user = request.user
+    player = user.player
+    if player.game:
+        return redirect('page-lobby-login-redirect')
+
+    game = get_object_or_404(
+        Game, join_game_id=join_game_id, is_started=False, is_over=False)
+    
+    return render(request, "join_game_by_id.html", {'game':game})
+
+
 def login_page(request):
     if request.method == 'POST':
         form = LoginForm(request.POST)
