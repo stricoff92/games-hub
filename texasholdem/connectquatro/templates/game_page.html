@@ -7,7 +7,58 @@
         console.log("{{ user.username }}")
     </script>
     <style>
+
+        .active-move-modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 30; /* Sit on top */
+            left: 0;
+            top: 0;
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgb(0,0,0);
+            background-color: rgba(0, 17, 90, 0.6);
+        }
+        /* Modal Content/Box */
+        .active-move-modal-content {
+            text-align:center;
+            background-color: #3b3b3b;
+            color:white;
+            margin: 15% auto; /* 15% from the top and centered */
+            width: 70%; /* Could be more or less, depending on screen size */
+            border-radius:12px;
+            font-size:2rem;
+        }
+
     </style>
+
+    <!-- Your move modal -->
+    <div class="active-move-modal">
+        <div class="active-move-modal-content pt-4 pb-4">
+            <p><stong>It's Your Turn</stong></p>
+        </div>
+    </div>
+
+    <script>
+        function modalIsOpen() {
+            return $(".active-move-modal").css("display") !== "none"
+        }
+        $(document).ready(() => {
+            const modal = $(".active-move-modal")
+            modal.click(e=>{
+                modal.css("display", "none")
+            })
+            window.onclick = function(event) {
+                if (modalIsOpen() && event.target == modal[0]) {
+                    modal.css("display", "none")
+                }
+            }
+            // $(".active-move-modal").css("display", "block")
+        })
+    </script>
+
+
     <div class="container mb-2">
         <!-- Header -->
         <div class="jumbotron pt-2 pb-2 mt-1 bg-dark text-white" id="game-page-header">
@@ -137,6 +188,7 @@
                 $("#game-page-header").removeClass("bg-dark")
                 $("#game-page-header").addClass("bg-success")
                 $(".drop-chip-btn").removeAttr("disabled");
+                $(".active-move-modal").css("display", "block")
             } else {
                 $("#game-page-header").removeClass("bg-success")
                 $("#game-page-header").addClass("bg-dark")
