@@ -407,7 +407,7 @@ class TestLobbyTest(APITestCase):
         self.mock_update_lobby_list_add_connect_quatro.assert_called_once_with(game, board)
 
     def test_lobby_leadership_is_passed_when_lobby_leader_leaves_an_unstarted_game(self):
-        """ Test player can leave a not started game what was full
+        """ Test lobby leadership is passed to a new player when the leader leaves
             
         """
         self.user2 = User.objects.create_user('testuser2@mail.com', password='password')
@@ -443,6 +443,46 @@ class TestLobbyTest(APITestCase):
         self.mock_push_player_promoted_to_lobby_leader.assert_called_once_with(self.player2, game)
         self.mock_update_lobby_list_player_count.assert_not_called()
         self.mock_update_lobby_list_remove_game.assert_not_called()
+
+
+    def test_lobby_leadership_is_not_passed_when_non_lobby_leader_leaves(self):
+        """ Test lobby leadership isnt passed to anyone when a non leader leaves
+        """
+        self.user2 = User.objects.create_user('testuser2@mail.com', password='password')
+        self.player2 = Player.objects.create(user=self.user2, handle="duuude")
+
+        game = Game.objects.create(
+            game_type=Game.GAME_TYPE_CHOICE_CONNECT_QUAT, name="foo", max_players=2, is_started=False)
+        board = Board.objects.create(game=game)
+        game_id = game.id
+        self.player1.game = game
+        self.player1.is_lobby_owner = True
+        self.player2.game = game
+        self.player1.save(update_fields=['game', 'is_lobby_owner'])
+        self.player2.save(update_fields=['game'])
+        self.assertEqual(game.players.count(), 2)
+
+        self.client.login(username='testuser2@mail.com', password='password')
+        url = reverse('api-lobby-leave')
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.player1.refresh_from_db()
+        self.player2.refresh_from_db()
+        self.assertTrue(Game.objects.filter(id=game_id).exists())
+        self.assertTrue(self.player1 in game.players.all())
+        self.assertTrue(self.player2 not in game.players.all())
+        self.assertEqual(game.players.count(), 1)
+        self.assertTrue(self.player1.is_lobby_owner)
+        self.assertFalse(self.player2.is_lobby_owner)
+    
+        self.mock_push_player_promoted_to_lobby_leader.assert_not_called()
+        self.mock_push_player_quit_game_event.assert_called_once_with(game, self.player2)
+        self.mock_update_lobby_list_add_connect_quatro.assert_called_once_with(game, board)
+        
+        self.mock_update_lobby_list_player_count.assert_not_called()
+        self.mock_update_lobby_list_remove_game.assert_not_called()
+
 
     def test_player_can_leave_a_unstarted_game_lobby_that_was_not_full(self):
         """ Test player can leave a game, game not deleted
