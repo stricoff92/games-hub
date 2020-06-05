@@ -442,7 +442,6 @@ class TestLobbyTest(APITestCase):
         # Missing join id
         response = self.client.post(url, {}, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertTrue("join_game_id is required for private game" in response.data)
 
         # Invalid join id
         response = self.client.post(url, {'join_game_id':'gggggggg'}, format="json")
