@@ -97,6 +97,7 @@ class TestLobbyTest(APITestCase):
         self.assertEqual(game.players.first(), self.player1)
         self.assertEqual(game.name, 'foo0 barR')
         self.assertEqual(game.game_type, Game.GAME_TYPE_CHOICE_CONNECT_QUAT)
+        self.assertEqual(game.tick_count, 0)
         self.assertTrue(game.is_public)
         self.assertEqual(self.player1.game, game)
         self.assertTrue(self.player1.is_lobby_owner)
@@ -136,6 +137,7 @@ class TestLobbyTest(APITestCase):
         self.assertEqual(game.game_type, Game.GAME_TYPE_CHOICE_CONNECT_QUAT)
         self.assertFalse(game.is_public)
         self.assertEqual(game.max_players, 2)
+        self.assertEqual(game.tick_count, 0)
         self.assertIsNotNone(game.join_game_id)
 
         self.assertEqual(self.player1.game, game)

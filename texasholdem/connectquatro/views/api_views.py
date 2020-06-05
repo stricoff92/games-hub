@@ -2,6 +2,7 @@
 
 from functools import wraps
 
+from django.db.models import F
 from rest_framework.decorators import (
     api_view,
     permission_classes,
@@ -86,6 +87,10 @@ def make_move(request):
                 cq_lib.ColumnOutOfRangeError):
             return Response(
                 "illegal move", status.HTTP_400_BAD_REQUEST)
+
+        game.tick_count = F('tick_count') + 1
+        game.save(update_fields=['tick_count'])
+
         board, new_player_to_act = cq_lib.cycle_player_turn(board)
         
         game_over, winning_player = cq_lib.get_game_over_state(board)
