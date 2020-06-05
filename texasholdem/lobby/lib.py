@@ -1,4 +1,6 @@
 
+import random
+
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.db import transaction
@@ -48,6 +50,7 @@ def player_leave_lobby(player):
     if game.is_started:
         raise TypeError("game is already started")
     game_was_full = game.is_full
+    player_was_lobby_leader = player.is_lobby_owner
     player.game = None
     player.is_lobby_owner = False
     player.save(update_fields=['game', 'is_lobby_owner'])
@@ -66,9 +69,12 @@ def player_leave_lobby(player):
                 raise NotImplementedError()
         else:
             update_lobby_list_player_count(game, game.players.count())
-
-
-
+        
+        if player_was_lobby_leader:
+            new_leader = sorted(game.players.all(), key=lambda p: random.random())[0]
+            new_leader.is_lobby_owner = True
+            new_leader.save(update_fields=['is_lobby_owner'])
+            push_player_promoted_to_lobby_leader(new_leader, game)
 
 
 # async channel layer functions
@@ -92,6 +98,18 @@ async def push_player_quit_game_event(game, player):
         game.channel_layer_name,
         {
             "type":"player.quit",
+            "playerSlug":player.slug,
+        }
+    )
+
+@async_to_sync
+async def push_player_promoted_to_lobby_leader(player, game):
+    print("push_player_promoted_to_lobby_leader()")
+    channel_layer = get_channel_layer()
+    await channel_layer.group_send(
+        game.channel_layer_name,
+        {
+            "type":"player.promoted",
             "playerSlug":player.slug,
         }
     )
