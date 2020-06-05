@@ -31,6 +31,12 @@ class GameTypeSelectionForm(forms.Form):
             raise forms.ValidationError("invalid roomtype")
         return cleaned_data
 
+
+class GamePrivacySettingsForm(forms.Form):
+    privacy = forms.ChoiceField(
+        choices=(('public', 'Public'), ('private', 'Private')), required=True)
+
+
 class NewConnectQuatroRoomForm(forms.Form):
     roomname = forms.CharField(required=True)
     boarddimx = forms.IntegerField(required=True)

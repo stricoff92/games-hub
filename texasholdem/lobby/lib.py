@@ -1,4 +1,5 @@
 
+import uuid
 import random
 
 from asgiref.sync import async_to_sync
@@ -11,17 +12,24 @@ from connectquatro.models import Board
 from connectquatro import lib as cq_lib
 
 
+def new_join_game_id() -> str:
+    while True:
+        new_id = str(uuid.uuid4()).replace("-", "")
+        if not Game.objects.filter(join_game_id=new_id).exists():
+            return new_id
+
 # sync database functions
 
 @transaction.atomic
 def player_create_connectquat_lobby(
     player, game_name:str, board_length_x:int, board_length_y:int, 
-    max_players:int, max_to_win:int):
+    max_players:int, max_to_win:int, is_public=True):
 
     game = Game.objects.create(
         game_type=Game.GAME_TYPE_CHOICE_CONNECT_QUAT,
         name=game_name, max_players=max_players,
-        is_public=True, is_started=False)
+        is_public=is_public, is_started=False,
+        join_game_id=new_join_game_id())
 
     board = Board.objects.create(
         game=game, max_to_win=max_to_win,
@@ -30,7 +38,9 @@ def player_create_connectquat_lobby(
     player.game = game
     player.is_lobby_owner = True
     player.save(update_fields=['game', 'is_lobby_owner'])
-    update_lobby_list_add_connect_quatro(game, board)
+
+    if is_public:
+        update_lobby_list_add_connect_quatro(game, board)
 
     return game
 
@@ -39,10 +49,12 @@ def player_join_lobby(player, game):
     player.game = game
     player.save(update_fields=['game'])
     alert_game_lobby_player_joined(game, player)
-    if game.is_full:
-        update_lobby_list_remove_game(game)
-    else:
-        update_lobby_list_player_count(game, game.players.count())
+    if game.is_public:
+        if game.is_full:
+            update_lobby_list_remove_game(game)
+        else:
+            update_lobby_list_player_count(game, game.players.count())
+
 
 @transaction.atomic
 def player_leave_lobby(player):

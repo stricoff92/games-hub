@@ -1,0 +1,15 @@
+
+{% extends 'base.html' %} 
+{% block 'body' %}
+<script>
+    const gameSlug = "{{ game.slug }}"
+    const gameJoinId = "{{ game.join_game_id }}"
+    const url = `/api/lobby/join/${gameSlug}/`
+    const data = {join_game_id: gameJoinId}
+    $(document).ready(() => {
+        postJson(url, data, () =>{
+            location.reload()
+        })
+    })
+</script>
+{% endblock %}

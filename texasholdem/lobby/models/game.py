@@ -1,6 +1,8 @@
 
 from collections import Counter
+
 from django.db import models
+from django.urls import reverse
 
 from .utils import generate_slug
 from lobby.models import Player
@@ -26,6 +28,8 @@ class Game(models.Model):
 
     slug = models.SlugField(unique=True)   
     name = models.CharField(max_length=24)
+
+    join_game_id = models.CharField(max_length=55, default=None, null=True, blank=True)
 
     GAME_TYPE_CHOICE_TEXAS_HOLDEM = 'texasholdem'
     GAME_TYPE_CHOICE_CONNECT_QUAT = 'connectquat'
@@ -58,6 +62,10 @@ class Game(models.Model):
     @property
     def chat_channel_layer_name(self):
         return f"{self.slug}-chat"
+    
+    @property
+    def join_game_page_url(self):
+        return reverse("page-join-by-id", kwargs={'join_game_id':self.join_game_id})
 
     def save(self, *args, **kwargs):
         if not self.slug:

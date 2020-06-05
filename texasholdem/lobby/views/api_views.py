@@ -11,7 +11,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 
 from lobby.models import Game, Player
-from lobby.forms import NewConnectQuatroRoomForm, GameTypeSelectionForm
+from lobby.forms import NewConnectQuatroRoomForm, GameTypeSelectionForm, GamePrivacySettingsForm
 from lobby import lib as lobby_lib
 from connectquatro import lib as cq_lib
 from connectquatro.models import Board as CQboard
@@ -33,6 +33,13 @@ def create_lobby(request):
         return Response(form.errors, status.HTTP_400_BAD_REQUEST) 
     game_type = game_type_form.cleaned_data['roomtype']
 
+    game_privacy_form = GamePrivacySettingsForm(request.data)
+    if not game_privacy_form.is_valid():
+        return Response(form.errors, status.HTTP_400_BAD_REQUEST) 
+    
+    privacy = game_privacy_form.cleaned_data['privacy']
+    is_public = privacy == 'public'
+
     if game_type == Game.GAME_TYPE_CHOICE_CONNECT_QUAT:
         cq_form = NewConnectQuatroRoomForm(request.data)
         if not cq_form.is_valid():
@@ -44,7 +51,7 @@ def create_lobby(request):
         max_to_win = cq_form.cleaned_data['boardwincount']
 
         game = lobby_lib.player_create_connectquat_lobby(
-            player, game_name, board_length_x, board_length_y, max_players, max_to_win)
+            player, game_name, board_length_x, board_length_y, max_players, max_to_win, is_public=is_public)
         data = {
             'id':game.id,
             'slug':game.slug,
@@ -127,6 +134,23 @@ def join_lobby(request, slug):
     if game.is_full:
         return Response(
             "Lobby is full", status.HTTP_400_BAD_REQUEST)
+
+    if game.is_over:
+        return Response(
+            "game is over", status.HTTP_400_BAD_REQUEST)
+    
+    if not game.is_public:
+        join_game_id = request.data.get("join_game_id")
+        if not join_game_id:
+            return Response(
+                "join_game_id is required for private game",
+                status.HTTP_400_BAD_REQUEST)
+        
+        if join_game_id != game.join_game_id:
+            return Response(
+                "invalid join_game_id", status.HTTP_400_BAD_REQUEST)
+
+
 
     lobby_lib.player_join_lobby(player, game)
     return Response({}, status.HTTP_200_OK)
