@@ -54,3 +54,6 @@ class ConnectQuatroConsumer(AsyncJsonWebsocketConsumer):
             data['game_state']['player_won'] = game_state['winner']['slug'] == player.slug
         
         await self.send_json(data)
+
+    async def player_promoted(self, data):
+        await self.send_json(data)

@@ -144,6 +144,9 @@
                     case "game.started":
                         location.reload()
                         break
+                    case "player.promoted":
+                        location.reload()
+                        break
                     default:
                         throw new Error("not implemented, type " + eventData.type)
                 }
