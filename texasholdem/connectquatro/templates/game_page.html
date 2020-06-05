@@ -1,0 +1,274 @@
+
+{% extends 'base.html' %} 
+{% block 'body' %}
+    <script>
+        const sockets = []
+        const closeSockets = () => sockets.forEach(s=>s.close())
+        console.log("{{ user.username }}")
+    </script>
+    <style>
+    </style>
+    <div class="container mb-2">
+        <!-- Header -->
+        <div class="jumbotron pt-2 pb-2 mt-1 bg-dark text-white" id="game-page-header">
+            <div style="display:flex;justify-content:center;">
+                <span style="font-size:1.5rem;">{{ game.name }}</span>
+            </div>
+            <div style="display:flex;justify-content:center;">
+                <i class="fas fa-arrow-alt-circle-right mr-2" style="font-size:2rem;"></i>
+                <span style="font-size:1.5rem;">Connect Quatro</span>
+                <i class="fas fa-arrow-alt-circle-right ml-2" style="font-size:2rem;"></i>
+            </div>
+        </div>
+        
+        <!-- Actions Pannel -->
+        <div class="card">
+            <div class="card-header">
+                Actions
+            </div>
+            <div class="card-body p-2">
+                <div style="display:flex;justify-content:space-around;" class="mt-1">
+                    <button id="leave-room-btn" class="btn btn-danger">
+                        Leave / Forfeit
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Pannel -->
+        <div class="card mt-4">
+            <div class="card-header">
+                Game Info
+            </div>
+            <div class="card-body p-2">
+                <div style="display:flex;" class="m-1">
+                    Players:
+                    {% for p in archived_players %}
+                        <span
+                            id="player-nametag-{{ p.slug }}"
+                            class="player-nametag badge badge-pill ml-1"
+                            style="background-color:{{ p.color }};color:white;font-size:1.2rem;display:flex;"
+                        >
+                            <span id="player-nametag-{{ p.slug }}-icon" class="player-nametag-icon mr-2" style="display:none;">
+                                <i class="far fa-hand-point-right"></i>
+                            </span>
+                            <span>{{ p.handle }}</span>
+                            <i 
+                                id="player-nametag-death-icon-{{ p.slug }}"
+                                class="fas fa-skull-crossbones ml-1"
+                                style="display:none;">
+                            </i>
+                        </span>
+                    {% endfor %}
+                </div>
+                <hr>
+                <div>
+                    Chips in-a-row to win: {{ board.max_to_win }}
+                </div>
+            </div>
+        </div>
+        <div id="outcome-pannel" style="display:none;">
+            <div class="mt-4" style="display:flex;justify-content:center;">
+                <div class="alert alert-dark" style="font-size:2rem;text-align:center;">
+                    <i class="fas fa-flag-checkered"></i>
+                    <strong>GAME OVER</strong>
+                    <i class="fas fa-flag-checkered"></i>
+                </div>
+            </div>
+            <div class="mt-4" style="display:flex;justify-content:center;">
+                <div class="alert alert-success" style="font-size:2rem;width:100%;text-align:center;">
+                    <strong><span id="winning-player-handle-slot"></span></strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Board -->
+        <style>
+            .board-cell {
+                border:8px solid yellow;
+                height:60px;
+                width:60px;
+            }
+            .circle-base {
+                border-radius: 50%;
+                behavior: url(PIE.htc);
+            }
+            .drop-chip-btn {
+
+            }
+        </style>
+        <div
+            style="display:flex;flex-direction:row;background-color:yellow;position:absolute;border-radius:7px;"
+            class="mt-3 pb-5"
+        >
+            {% for col_ix in cols_list %}
+                <div>
+                    <div style="text-align:center;" class="mt-2">
+                        <button columnIndex="{{ col_ix }}" class="btn btn-primary drop-chip-btn" disabled>
+                            <i class="fas fa-arrow-alt-circle-down"></i>
+                        </button>
+                    </div>
+                    <div>
+                        {% for row_ix in rows_list %}
+                            <div 
+                                id='cell-{{ col_ix }}-{{ row_ix }}'
+                                class="circle-base board-cell"
+                                style="background-color: white;"
+                            >
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+    
+        <!-- Chat Window -->
+        {% include 'chatbox.html' %}
+    </div>
+    <script>
+        function gameIsOver() {
+            return $("#outcome-pannel").css("display") !== "none"
+        }
+        function drawGameState(gameState) {
+            console.log("drawing gamestate", gameState)
+            // Set jumbotron
+            if(!gameState.game_over && gameState.active_player) {
+                $("#game-page-header").removeClass("bg-dark")
+                $("#game-page-header").addClass("bg-success")
+                $(".drop-chip-btn").removeAttr("disabled");
+            } else {
+                $("#game-page-header").removeClass("bg-success")
+                $("#game-page-header").addClass("bg-dark")
+                $(".drop-chip-btn").attr("disabled", true);
+            }
+            // Add active player turn badge
+            const activePlayerSlug = gameState.next_player_slug
+            if(activePlayerSlug) {
+                $(".player-nametag-icon").css('display', 'none')
+                $(`#player-nametag-${activePlayerSlug}-icon`).css('display', 'block')
+            }
+            
+            const playerColorsById = {}
+            const playerColorsByslug = {}
+            gameState.players.forEach(p=>{
+                playerColorsById[p.id] = p.color
+                playerColorsByslug[p.slug] = p.color
+            })
+
+            const board_list = gameState.board_list
+            const board_len = board_list.length
+            for(let row_ix=0; row_ix<board_len; row_ix++) {
+                row_len = board_list[row_ix].length
+                for(let col_ix=0; col_ix<row_len; col_ix++) {
+                    player_id_this_circle = board_list[row_ix][col_ix]
+                    let this_circles_color = playerColorsById[player_id_this_circle]
+                    $(`#cell-${col_ix}-${row_ix}`).css("backgroundColor", this_circles_color)
+                }
+            }
+
+            if(gameState.game_over) {
+                if(gameState.player_won) {
+                    $("#winning-player-handle-slot").text("You Win!")
+                } else {
+                    // TODO: DEFEAT colors/message
+                    $("#winning-player-handle-slot").text(
+                        `${gameState.winner.handle} Wins`)
+                }
+                $("#outcome-pannel").slideDown()
+                $("#leave-room-btn").removeClass("btn-danger")
+                $("#leave-room-btn").addClass("btn-primary")
+                $("#leave-room-btn").text("Return to Lobbies")
+                $("#leave-room-btn").css("font-size", "2rem")
+            }
+            
+            const currentPlayerSlugs = gameState.players.map(p=>p.slug)
+            const nametags = $(".player-nametag")
+            nametags.each(ix =>{
+                let nametag = nametags[ix]
+                let slugMatch = $(nametag).attr("id").match(/[a-zA-Z0-9]{6,}$/)
+                let nametagPlayerSlug = slugMatch ? slugMatch[0] : null
+                if (nametagPlayerSlug && currentPlayerSlugs.indexOf(nametagPlayerSlug) === -1) {
+                    $(`#player-nametag-death-icon-${nametagPlayerSlug}`).css("display", "block")
+                    $(nametag).css("font-style", "italic")
+                }
+            })
+
+        }
+
+        function main() {
+            (function(){
+                // Instantiate websocket client for chat
+                const socket = new WebSocket(
+                    'ws://' + window.location.host + '/connectquatro/')
+                socket.onerror = err => {
+                    console.error('socket error')
+                    console.error(err)
+                }
+                socket.addEventListener('open', event => {});
+                socket.onclose = function(e) {
+                    console.log("connectquat socket closed, retrying in 3 seconds")
+                    console.log(e)
+                    setTimeout(main, 3000);
+                };
+                socket.onmessage = message => {
+                    eventData = JSON.parse(message.data)
+                    console.log({eventData})
+                    switch(eventData.type) {
+                        case "game.move":
+                            drawGameState(eventData.game_state)
+                            break
+                    }
+                }
+            })()
+        }
+    
+        setTimeout(main)
+
+        $("#leave-room-btn").click(event => {
+            if(!gameIsOver()) {
+                if(!confirm("TAKE HEED!\n\nYou are about to lose this game.")) {
+                    return
+                }
+            }
+            $.ajax({
+                url:"{% url 'api-lobby-leave' %}",
+                type:"POST",
+                success:()=>{
+                    window.location = "{% url 'page-lobby-login-redirect' %}"
+                },
+            })
+        })
+
+        $(".drop-chip-btn").click(event => {
+            const isDisabled = $(event.currentTarget).attr("disabled")
+            if (isDisabled) {
+                alert("button is disabled")
+                return
+            }
+            const columIndex = $(event.currentTarget).attr("columnIndex")
+            postJson("{% url 'api-connectquat-move' %}",
+                {column_index:columIndex}, 
+                data => {
+                    drawGameState(data)
+                }, err => {
+                    console.error(err)
+                    if (err.status < 500) {
+                        alert(err.responseText)
+                    }
+                })
+        })
+        
+        $(document).ready(() => {
+            $.ajax({
+                type:"GET",
+                url:"{% url 'api-connectquat-ping' %}",
+                success:data => {
+                    drawGameState(data)
+                }
+            })
+        })
+
+    
+    </script>
+{% endblock %} 

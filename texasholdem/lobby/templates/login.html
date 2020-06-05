@@ -1,0 +1,40 @@
+
+{% extends 'base.html' %} 
+{% block 'body' %}
+    <div class="container">
+        <div class="card pt-1 pb-3 mt-4 mb-3">
+            <div class="card-header mb-3">
+                Returning Users
+            </div>
+            <h4 class="mb-4" style="display:flex;justify-content:center;">
+                Login
+            </h4>
+            <div style="display:flex;justify-content:center;">
+                <form action="{% url 'page-lobby-login' %}" method="post">
+                    {% csrf_token %}
+                    {{ form.as_p }}
+                    <input type="submit" value="Login">
+                </form>
+            </div>
+        </div>
+
+        <div class="card pt-1 pb-3 mt-4 mb-3">
+            <div class="card-header mb-3">
+                New Users
+            </div>
+            <h4 class="mb-4" style="display:flex;justify-content:center;">
+                Register
+            </h4>
+            <div style="display:flex;justify-content:center;">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <input type="submit" value="Register">
+                </form>
+            </div>
+        </div>
+
+    </div>
+    <script>
+    </script>
+{% endblock %} 

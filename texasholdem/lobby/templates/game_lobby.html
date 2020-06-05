@@ -1,0 +1,182 @@
+
+{% extends 'base.html' %} 
+{% block 'body' %}
+<script>
+    const sockets = []
+    const closeSockets = () => sockets.forEach(s=>s.close())
+    console.log("{{ user.username }}")
+</script>
+<style>
+    #chat-title-bar:hover {
+        cursor:pointer;
+    }
+    .game-record-row-header:hover {
+        cursor:pointer;
+    }
+</style>
+<div class="container mb-2">
+    <div
+        class="jumbotron pt-2 pb-2 mt-1 bg-dark text-white"
+    >
+        <div style="display:flex;justify-content:center;">
+            <h1 style="font-size:3rem;">{{ game.name }}</h1>
+        </div>
+        <div style="display:flex;justify-content:center;">
+            <h1 style="font-size:2rem;">{{ game_type }}</h1>
+        </div>
+    </div>
+
+    <div class="card" style="display:none;" id="fade-in-container-1">
+        <div class="card-header">
+            Actions
+        </div>
+        <div class="card-body p-2">
+            <div style="display:flex; justify-content:space-around;" class="mt-1">
+                <button id="leave-room-btn" class="btn btn-danger">
+                    Leave Room
+                </button>
+                {% if player.is_lobby_owner %}
+                    <button id="start-lobby-btn" class="btn btn-success">
+                        Start Game
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div style="display:none;" class="card mt-3" id="fade-in-container-2">
+        <div class="card-header">Players</div>
+        <div class="card-body p-2">
+            <div id="player-name-tags">
+                {% for player in game.players.all %}
+                    {% if player.is_lobby_owner %}
+                        <span
+                            id="player-nametag-{{ player.slug }}"
+                            style="font-size:1.2rem;" 
+                            class="badge badge-pill badge-warning m-1"
+                        >
+                            <i class="fas fa-star"></i>
+                            {{ player.handle }}
+                        </span>
+                    {% else %}
+                        <span
+                            id="player-nametag-{{ player.slug }}"
+                            style="font-size:1.2rem;"
+                            class="badge badge-pill badge-dark m-1"
+                        >
+                            {{ player.handle }}
+                        </span>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div style="display:none;" class="card mt-3 mb-5" id="fade-in-container-3">
+        <div class="card-header">Game Rules</div>
+        <div class="card-body p-2">
+            {% for rule in rules %}
+                <span style="font-size:1.2rem;" class="badge badge-pill badge-secondary m-1">
+                    {{ rule }}
+                </span>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Chat Window -->
+    {% include 'chatbox.html' %}
+</div>
+<script>
+
+    setTimeout(()=>{
+        console.log(1)
+        $("#fade-in-container-1").fadeIn()
+    }, 50)
+    setTimeout(()=>{
+        console.log(2)
+        $("#fade-in-container-2").fadeIn()
+    }, 300)
+    setTimeout(()=>{
+        console.log(3)
+        $("#fade-in-container-3").fadeIn()
+    }, 500)
+
+    function RemovePlayerFromRoom(eventData) {
+        $(`#player-nametag-${eventData.playerSlug}`).remove();
+    }
+    
+    function addPlayerToRoom(eventData) {
+        const slug = eventData.playerSlug
+        const handle = eventData.playerHandle
+       $('#player-name-tags').append(
+           `<span
+                id="player-nametag-${slug}"
+                style="font-size:1.2rem;" 
+                class="badge badge-pill badge-dark m-1"
+            >
+                ${handle}
+            </span>`)
+    }
+
+    function main() {
+        (function(){
+            // Instantiate websocket client for room updates
+            const socket = new WebSocket(
+                'ws://' + window.location.host + '{{ game_socket_url }}')
+            socket.onerror = err =>{
+                console.error('socket error')
+                console.error(err)
+            }
+            socket.addEventListener('open', event => {});
+            socket.onclose = function(e) {
+                setTimeout(main, 3000);
+            };
+
+            socket.onmessage = message => {
+                eventData = JSON.parse(message.data)
+                switch(eventData.type) {
+                    case "player.joined":
+                        addPlayerToRoom(eventData)
+                        break
+                    case "player.quit":
+                        RemovePlayerFromRoom(eventData)
+                        break
+                    case "game.started":
+                        location.reload()
+                        break
+                    default:
+                        throw new Error("not implemented, type " + eventData.type)
+                }
+            }
+
+        })()
+    }
+
+    setTimeout(main)
+
+    $("#leave-room-btn").click(event => {
+        $.ajax({
+            url:"{% url 'api-lobby-leave' %}",
+            type:"POST",
+            success: data => {
+                window.location = "{% url 'page-lobby-list' %}"
+            }
+        })
+    })
+
+    $("#start-lobby-btn").click(event => {
+        $.ajax({
+            url:"{% url 'api-lobby-start' %}",
+            type:"POST",
+            success: data => {},
+            error:resp => {
+                if (resp.status < 500) {
+                    alert(resp.responseText)
+                }
+            }
+        })
+    })
+
+</script>
+
+{% endblock %} 

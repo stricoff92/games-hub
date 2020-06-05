@@ -1,0 +1,188 @@
+
+<div 
+    id="player-chats"
+    class="card"
+    style="position:fixed; bottom:10px; width:60%; z-index:10;"
+>
+    <div 
+        id="chat-title-bar"
+        class="card-header bg-primary text-white p-0 pl-2"
+        style="display:flex;justify-content:space-between;"
+    >
+        <span>
+            <span>Chat <i class="fas fa-comment"></i></span>
+            <span id="chat-notification-container"></span>
+        </span>
+        <span id="chat-header-right-corner" class="pr-2"><i>tap to open</i></span>
+    </div>
+    <div id="player-chats-inner-container" style="display:none" class="card-body p-0">
+        <div id="chat-bubbles" style="max-height:250px;overflow-y:scroll;">
+        </div>
+        <div
+            id="chat-input-container"
+            style="display:flex;"
+            class="mt-3">
+            <input
+                placeholder="type here"
+                type="text"
+                id="chat-input-text"
+                style="flex-grow:1"
+                class="p-2 mr-3">
+            <button id="chat-input-send" class="btn btn-primary">send</button>
+        </div>
+    </div>
+</div>
+<script>
+    function chatWindowOpen(){
+        return $("#player-chats-inner-container").css("display") != "none"
+    }
+    function chatBoxInFocus() {
+        return document.activeElement === $("#chat-input-text")[0]
+    }
+    function elementScrolledToBottom(element) { 
+        return element[0].scrollHeight - element.scrollTop() == element.outerHeight()
+    }
+    function incrementChatNotificationNumber() {
+        let badgeElement = $('#chat-notification-container').children()[0]
+        let nextIndex = 1;
+        if (badgeElement) {
+            nextIndex = (badgeElement.innerText - 0) + 1
+        }
+        $('#chat-notification-container').html(
+            `<span class="badge badge-danger">${nextIndex}</span>`)
+    }
+    function scrollChatToMostRecent(){
+        // https://stackoverflow.com/questions/13362/scrolling-overflowed-divs-with-javascript
+        chatBubbles = $("#chat-bubbles")[0]
+        const scrollHeight = Math.max(chatBubbles.scrollHeight, chatBubbles.clientHeight);
+        chatBubbles.scrollTop = scrollHeight - chatBubbles.clientHeight;
+    }
+    $("#chat-title-bar").click(e => {
+        const openClasses = ['p-2']
+        const closedClasses = ['pt-0', 'pb-0', 'pl-2']
+        if (chatWindowOpen()) {
+            // Close chat window.
+            $("#player-chats-inner-container").css("display", "none")
+            $('#chat-title-bar').removeClass(openClasses)
+            $('#chat-title-bar').addClass(closedClasses)
+            $("#chat-header-right-corner").html("<i>tap to open</i>")
+        } else {
+            // Open chat window.
+            $("#player-chats-inner-container").css("display", "block")
+            $('#chat-title-bar').removeClass(closedClasses)
+            $('#chat-title-bar').addClass(openClasses)
+            $("#chat-header-right-corner").html("close X")
+            setTimeout(scrollChatToMostRecent, 0)
+            $('#chat-notification-container').html('')
+        }
+    })
+    document.addEventListener("keyup", function(event) {
+        const enteyKeyCode = 13
+        if(event.keyCode === enteyKeyCode && chatWindowOpen() && chatBoxInFocus()) {
+            $("#chat-input-send").trigger("click");
+        }
+    })
+
+    // websocket handler methods
+    function addNewChatMessage(eventData) {
+        let chatBubbles = $("#chat-bubbles")
+        const onChatPage = chatWindowOpen()
+        let isScrolledToBottom = false
+        if (onChatPage) {
+            isScrolledToBottom = elementScrolledToBottom(chatBubbles)
+        }
+        chatBubbles.append(`
+            <div style="display:none;" class="card p-1 new-message-card">
+                <div style="display:flex;">
+                    <span
+                        style="font-size:1rem;max-width:40%"
+                        class="p-2 badge badge-pill ${eventData.isSelf ? 'badge-primary' : 'badge-secondary'}"
+                    >
+                        ${eventData.is_lobby_owner ? '<i class="fas fa-star"></i>' : ''}
+                        ${eventData.handle}
+                    </span>
+                    <div class="ml-1" style="font-size:1rem;word-wrap:word-break;max-width:60%">
+                        ${eventData.message}
+                    </div>
+                </div>
+            </div>
+        `)
+        $(".new-message-card").fadeIn(300)
+        if(onChatPage && isScrolledToBottom) {
+            setTimeout(scrollChatToMostRecent, 0)
+        }
+        if (!onChatPage) {
+            incrementChatNotificationNumber()
+        }
+    }
+    function addNewChatAnouncement(eventData) {
+        $("#chat-bubbles").append(`
+            <div style="display:none;" class="card p-1" class="new-message-card">
+                <div style="display:flex;">
+                    <span
+                        style="font-size:1rem;"
+                        class="badge badge-info badge-pill p-2"
+                    >
+                        <i class="fas fa-robot"></i>
+                    </span>
+                    <div class="ml-1" style="font-size:1rem;">
+                        ${eventData.announcement}
+                    </div>
+                </div>
+            </div>
+        `)
+        $(".new-message-card").fadeIn()
+    }
+
+    const chatSocketMain = () => {(function(){
+    
+        // Instantiate websocket client for chat
+        const chatSocketUrl = 'ws://' + window.location.host + '{{ chat_socket_url }}'
+        console.log("chatSocketIO connecting to " + chatSocketUrl)
+        const chatSocketIO = new WebSocket(chatSocketUrl)
+        chatSocketIO.addEventListener('open', event => {console.log("socket open")});
+        chatSocketIO.onclose = function(e) {
+            console.log('chatSocketIO is closed. Reconnect will be attempted in 3 second.');
+            console.log(e)
+            setTimeout(chatSocketMain, 3000);
+            closeSockets()
+        };
+        chatSocketIO.onerror = err =>{
+            console.error('chatSocketIO error')
+            console.error(err)
+        }
+        chatSocketIO.onmessage = message => {
+            eventData = JSON.parse(message.data)
+            switch(eventData.type) {
+                case "chat.message":
+                    addNewChatMessage(eventData)
+                    break
+                case "chat.announcement":
+                    addNewChatAnouncement(eventData)
+                    break
+                default:
+                    throw new Error("not implemented, type " + eventData.type)
+            }
+        }
+
+        $('#chat-input-send').click(e => {
+            const message = $("#chat-input-text").val();
+            if(!message) {
+                return
+            }
+            chatSocketIO.send(JSON.stringify({
+                method: 'chat.message',
+                message,
+            }))
+            $("#chat-input-text").val("")
+            $("#chat-input-text").focus()
+            scrollChatToMostRecent()
+        })
+
+        sockets.push(chatSocketIO)
+        
+
+    })()}
+    setTimeout(chatSocketMain)
+
+</script>

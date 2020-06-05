@@ -1,0 +1,288 @@
+
+{% extends 'base.html' %}
+
+{% block 'body' %}
+    <script>
+        const sockets = []
+        const closeSockets = () => sockets.forEach(s=>s.close())
+    </script>
+    <style>
+        #chat-title-bar:hover {
+            cursor:pointer;
+        }
+        .game-record-row-header:hover {
+            cursor:pointer;
+        }
+    </style>
+    <div class="container mb-2">
+        <div
+            class="jumbotron pt-2 pb-2 mt-1 bg-dark text-white"
+        >
+            <div style="display:flex;justify-content:center;">
+                <h1 style="font-size:3rem;">Lobby</h1>
+            </div>
+        </div>
+
+        <div>
+            <button id="create-room-btn" class="btn btn-success mb-4">
+                Create a Room
+            </button>
+            <div 
+                id="create-new-room-form-wrapper" 
+                class="card p-3" 
+                style="display:none;"
+            >
+                <h4 class="mb-3">Create a new room</h4>
+                <div id="new-room-form-errors-container" class="mt-2 mb-2">
+                </div>
+                <form id="new-room-form">
+                    <p>
+                        Room Name
+                        <input type="text" class="ml-2" name="roomname" placeholder="ex: {{ example_name }}">
+                    </p>
+                    <p>
+                        Room Type
+                        <select id="room-type-selection" class="ml-3" name="roomtype">
+                            {% for game_type in game_types %}
+                                <option value="{{ game_type.0 }}" class="game-type-option">
+                                    {{ game_type.1 }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </p>
+                    <div id="new-room-form-additional-details-container">
+
+                    </div>
+                    <div>
+                        <input type="button" class="btn btn-success" onclick="submitNewRoomForm()" value="Create Room">
+                    </div>
+                </form>
+            </div>
+        </div>
+        <div class="mt-3" style="display:flex;">
+            <div style="min-width:300px;" class="alert alert-info">
+                Or join a room <i class="fas fa-hand-point-down"></i>
+            </div>
+        </div>
+
+        <div id="lobby-list">
+        </div>
+
+        {% include 'chatbox.html' %}
+
+    </div>
+    <script>
+        // New room form
+        $("#create-room-btn").click(()=>{
+            $("#create-room-btn").slideUp(300, () =>{
+                setTimeout(()=>{
+                    $("#create-new-room-form-wrapper").slideDown()
+                }, 75)
+            })
+        })
+        $("#room-type-selection").change(event => {
+            const gameTypeSelection = $("#room-type-selection").val()
+            console.log()
+            if (gameTypeSelection == 'connectquat') {
+                updateNewRoomFormForConnectQuatro()
+            } else if (gameTypeSelection == 'texasholdem') {
+                updateNewRoomFormForTexasHoldem()
+            }
+        })
+        $("#room-type-selection").trigger("change")
+
+
+        function connectQuatroGameRowHTML(game) {
+            return `
+                <div
+                    id="game-record-row-${game.slug}"
+                    class="card game-selection-row" 
+                >
+                    <div 
+                        id="game-record-row-header-${game.slug}"
+                        class="game-record-row-header card-header pb-2 pt-2"
+                        style="display:flex;flex-direction:row;justify-content:space-around;"
+                    >
+                        <div>
+                            Connect Quat ${game.connect_quatro_board.board_length_x}x${game.connect_quatro_board.board_length_y}
+                        </div>
+                        <div>
+                            ${game.name}
+                        </div>
+                        <div>
+                            <span><i class="fas fa-user-friends"></i></span>
+                            <span><span id="player-count-${game.slug}">${game.player_count}</span>/${game.max_players}</span>
+                        </div>
+                    </div>
+                    <div id="game-record-row-body-${game.slug}" class="card-body" style="display:none;text-align:right;">
+                        <button class="btn btn-primary" onclick="joinGame('${game.slug}')">Join</button>
+                    </div>
+                </div>
+            `
+        }
+
+        function updatePlayerCount(eventData){
+            console.log("updatePlayerCount", eventData)
+            const slug = eventData.slug
+            const count = eventData.count
+            $(`#player-count-${slug}`).html(count)
+        }
+        function addRoomToList(eventData) {
+            $("#lobby-list").prepend(connectQuatroGameRowHTML(eventData))
+            $(`#game-record-row-header-${eventData.slug}`).click(event => {
+                $(`#game-record-row-body-${eventData.slug}`).slideDown(200);
+            })
+        }
+        function removeRoomFromList(eventData) {
+            console.log("removeRoomFromList")
+            const slug = eventData.slug
+            $(`#game-record-row-${slug}`).remove()
+        }
+        
+        const roomUpdatemain = () => {(function(){ // \\ }()noitcnuf)} <= () = niam tsnoc
+    
+            // Instantiate websocket client for room updates
+            const gameStatusSocketIOUrl = 'ws://' + window.location.host + '/lobby/rooms/'
+            const roomsSocketIO = new WebSocket(gameStatusSocketIOUrl)
+            roomsSocketIO.onerror = err => {
+                console.error('roomsSocketIO error')
+                console.error(err)
+            }
+            roomsSocketIO.onclose = function(e) {
+                console.log('roomsSocketIO is closed. Reconnect will be attempted in 3 second.', e.reason);
+                setTimeout(roomUpdatemain, 3000);
+                closeSockets()
+            };
+            roomsSocketIO.addEventListener('open', event => {});
+
+            roomsSocketIO.onmessage = message => {
+                eventData = JSON.parse(message.data)
+                switch(eventData.type) {
+                    case "room.player.count.update":
+                        updatePlayerCount(eventData)
+                        break
+                    case "room.remove":
+                        removeRoomFromList(eventData)
+                        break
+                    case "room.add":
+                        addRoomToList(eventData)
+                        break
+                    default:
+                        throw new Error("not implemented, type " + eventData.type)
+                }
+            }
+            sockets.push(roomsSocketIO)
+
+        })()}
+
+        setTimeout(roomUpdatemain)
+
+        $(document).ready(()=>{
+            $.ajax({
+                url:"{% url 'api-lobby-list' %}",
+                success: data => {
+                    $("#lobby-list").html("")
+                    let counter = 0
+                    let waitInMS = 30
+                    data.forEach(game => {
+                        counter++
+                        setTimeout(()=>{
+                            if(game.game_type == 'connectquat') {
+                                $("#lobby-list").append(connectQuatroGameRowHTML(game))
+                                $(`#game-record-row-header-${game.slug}`).click(event => {
+                                    $(`#game-record-row-body-${game.slug}`).slideDown(200)
+                                })
+                            }
+                        }, counter*waitInMS)
+                    })
+                }
+            })
+        })
+        function joinGame(gameSlug) {
+            $.ajax({
+                type:'POST',
+                url:`/api/lobby/join/${gameSlug}/`,
+                success: data => {
+                    location.reload()
+                }
+            })
+        }
+
+        // Create new room form control
+        function updateNewRoomFormForConnectQuatro(){
+            $("#new-room-form-additional-details-container").html(`
+                <p>Board Width <input class="ml-2" type="number" name="boarddimx" value="7"></p>
+                <p>Board Height <input class="ml-2" type="number" name="boarddimy" value="7"></p>
+                <p>Pieces in a Row to Win <input class="ml-2" type="number" name="boardwincount" value="4"></p>
+                <p>
+                    Number of players
+                    <select class="ml-2" name="boardplayercount">
+                        <option value="2">2</option>
+                        <option value="3">2</option>
+                        <option value="4">4</option>
+                    </select>
+                </p>
+            `)
+        }
+        function updateNewRoomFormForTexasHoldem(){
+            $("#new-room-form-additional-details-container").html(`
+                
+            `)
+        }
+        function submitNewRoomForm() {
+            const formData = {}
+            $("#new-room-form").serializeArray().forEach(field => formData[field.name] = field.value)
+            switch(formData.roomtype) {
+                case 'connectquat':
+                    submitNewConnectQuatRoomForm(formData)
+                    break
+                case 'texasholdem':
+                    break
+                default:
+                    throw new Error("not implemented")
+            }
+        }
+        function submitNewConnectQuatRoomForm(formData) {
+            removeAllNewRoomFormErrors()
+            const errors = []
+
+            if (!formData.roomname) {
+                errors.push("Room Name is required")
+            }
+            if ((formData.boarddimx - 0) > 20 || (formData.boarddimx - 0) < 5){
+                errors.push("Board Width Must be Between 5 and 20")
+            }
+            if ((formData.boarddimy - 0) > 20 || (formData.boarddimy - 0) < 5){
+                errors.push("Board Height Must be Between 5 and 20")
+            }
+            if ((formData.boardwincount - 0) > 15 || (formData.boardwincount - 0) < 3){
+                errors.push("Pieces in a Row to Win Must be Between 3 and 15")
+            }
+            const biggestSide = Math.max((formData.boarddimy - 0), (formData.boarddimx - 0))
+            if ((formData.boardwincount - 0) > biggestSide) {
+                errors.push("Board too small for Pieces in a Row to Win")
+            }
+
+
+            if (errors.length) {
+                errors.map(addNewRoomFormError)
+            } else {
+                console.log("submitting", formData)
+                postJson("{% url 'api-lobby-create' %}", formData, data=>{
+                    location.reload()
+                })
+            }
+        }
+        function removeAllNewRoomFormErrors() {
+            $("#new-room-form-errors-container").html('')
+        }
+        function addNewRoomFormError(message) {
+            $("#new-room-form-errors-container").append(`
+                <div class="alert alert-danger mb-1">
+                    ${message}
+                </div>
+            `)
+
+        }
+    </script>
+{% endblock %} 
