@@ -55,9 +55,11 @@ def create_lobby(request):
         board_length_y = cq_form.cleaned_data['boarddimy']
         max_players = cq_form.cleaned_data['boardplayercount']
         max_to_win = cq_form.cleaned_data['boardwincount']
+        max_seconds_per_turn = cq_form.cleaned_data['max_seconds_per_turn']
 
         game = lobby_lib.player_create_connectquat_lobby(
-            player, game_name, board_length_x, board_length_y, max_players, max_to_win, is_public=is_public)
+            player, game_name, board_length_x, board_length_y, max_players, max_to_win,
+            max_seconds_per_turn, is_public=is_public)
         data = {
             'id':game.id,
             'slug':game.slug,

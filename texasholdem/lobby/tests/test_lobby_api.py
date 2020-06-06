@@ -91,6 +91,7 @@ class TestLobbyTest(APITestCase):
             'boardplayercount':2,
             'boardwincount':5,
             'privacy':'public',
+            'max_seconds_per_turn':10,
         }
         url = reverse('api-lobby-create')
         response = self.client.post(url, data, format="json")
@@ -103,6 +104,7 @@ class TestLobbyTest(APITestCase):
         self.assertEqual(game.name, 'foo0 barR')
         self.assertEqual(game.game_type, Game.GAME_TYPE_CHOICE_CONNECT_QUAT)
         self.assertEqual(game.tick_count, 0)
+        self.assertEqual(game.max_seconds_per_turn, 10)
         self.assertTrue(game.is_public)
         self.assertEqual(self.player1.game, game)
         self.assertTrue(self.player1.is_lobby_owner)
@@ -127,6 +129,7 @@ class TestLobbyTest(APITestCase):
             'boardplayercount':2,
             'boardwincount':5,
             'privacy':'private',
+            'max_seconds_per_turn':20
         }
         url = reverse('api-lobby-create')
         response = self.client.post(url, data, format="json")
@@ -143,6 +146,7 @@ class TestLobbyTest(APITestCase):
         self.assertFalse(game.is_public)
         self.assertEqual(game.max_players, 2)
         self.assertEqual(game.tick_count, 0)
+        self.assertEqual(game.max_seconds_per_turn, 20)
         self.assertIsNotNone(game.join_game_id)
 
         self.assertEqual(self.player1.game, game)
@@ -166,6 +170,7 @@ class TestLobbyTest(APITestCase):
             'boardplayercount':2,
             'boardwincount':5,
             'privacy':'public',
+            'max_seconds_per_turn':12,
         }
         url = reverse('api-lobby-create')
         response = self.client.post(url, data, format="json")
@@ -189,6 +194,7 @@ class TestLobbyTest(APITestCase):
             'boardplayercount':2,
             'boardwincount':5,
             'privacy':'public',
+            'max_seconds_per_turn':12,
         }
         url = reverse('api-lobby-create')
         response = self.client.post(url, data, format="json")

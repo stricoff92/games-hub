@@ -23,12 +23,13 @@ def new_join_game_id() -> str:
 @transaction.atomic
 def player_create_connectquat_lobby(
     player, game_name:str, board_length_x:int, board_length_y:int, 
-    max_players:int, max_to_win:int, is_public=True):
+    max_players:int, max_to_win:int, max_seconds_per_turn:int, is_public=True):
 
     game = Game.objects.create(
         game_type=Game.GAME_TYPE_CHOICE_CONNECT_QUAT,
         name=game_name, max_players=max_players,
         is_public=is_public, is_started=False,
+        max_seconds_per_turn=max_seconds_per_turn,
         join_game_id=new_join_game_id())
 
     board = Board.objects.create(
