@@ -45,6 +45,7 @@ class Game(models.Model):
     is_over = models.BooleanField(default=False)
 
     tick_count = models.PositiveIntegerField(blank=True, default=0)
+    max_seconds_per_turn = models.PositiveIntegerField(default=30)
 
     archived_players = models.ManyToManyField(
         'lobby.Player', related_name="archived_games")

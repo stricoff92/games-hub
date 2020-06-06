@@ -13,6 +13,7 @@ from lobby.models import Player, Game
 from lobby import views
 from connectquatro.models import Board
 from connectquatro import lib as cq_lib
+from connectquatro import tasks
 
 class TestConnectquatroAPI(APITestCase):
     def setUp(self):
@@ -25,9 +26,13 @@ class TestConnectquatroAPI(APITestCase):
 
         self.mock_alert_game_players_to_new_move = patch.object(
             cq_lib, 'alert_game_players_to_new_move').start()
+        
+        self.mock_cycle_player_turn_if_inactive = patch.object(
+            tasks.cycle_player_turn_if_inactive, 'delay').start()
 
     def tearDown(self):
         self.mock_alert_game_players_to_new_move.stop()
+        self.mock_cycle_player_turn_if_inactive.stop()
     
 
     def test_player_can_drop_chip_on_empty_board_when_its_their_turn(self):
@@ -97,6 +102,71 @@ class TestConnectquatroAPI(APITestCase):
         self.assertTrue(self.player1.slug in passed_player_slugs)
         self.assertTrue(self.player2.slug in passed_player_slugs)
         self.assertEqual(passed_game_state['next_player_slug'], self.player2.slug)
+
+
+    def test_turn_timeout_task_starts_when_player_makes_non_winning_move(self):
+        game = Game.objects.create(
+            game_type=Game.GAME_TYPE_CHOICE_CONNECT_QUAT, name="fooo", is_started=True, 
+            max_players=2)
+        self.player1.game = game
+        self.player2.game = game
+        self.player1.save()
+        self.player2.save()
+        board_state = cq_lib.board_obj_to_serialized_state({
+            Board.STATE_KEY_NEXT_PLAYER_TO_ACT:self.player1.id,
+            Board.STATE_KEY_BOARD_LIST:[[None for i in range(7)] for j in range(7)]
+        })
+        board = Board.objects.create(
+            game=game, board_state=board_state, board_length_x=7, board_length_y=7)
+
+        self.client.login(username='testuser1@mail.com', password='password')
+        url = reverse('api-connectquat-move')
+        data = {'column_index':3}
+        response = self.client.post(url, data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertEqual(len(self.mock_cycle_player_turn_if_inactive.call_args_list), 1)
+        self.assertEqual(self.mock_cycle_player_turn_if_inactive.call_args_list[0][0][0], game.id)
+
+
+    def test_turn_timeout_task_does_not_start_when_player_wins(self):
+        game = Game.objects.create(
+            game_type=Game.GAME_TYPE_CHOICE_CONNECT_QUAT, name="fooo", is_started=True, 
+            max_players=2)
+        self.player1.game = game
+        self.player2.game = game
+        self.player1.save()
+        self.player2.save()
+        game.archived_players.set([self.player1, self.player2])
+        p1 = self.player1.id
+        p2 = self.player2.id
+        board_list = [
+            [None, None, None, None, None, None, None],
+            [None, None, None, None, None, None, None],
+            [None, None, None, None, None, None, None],
+            [None, None, None, None, None, None, None],
+            [None, None, p1, p2, None, None, None],
+            [None, p1, p2, p2, None, None, None],
+            [p1, p2, p2, p2, None, None, None],
+        ]
+        board_state = cq_lib.board_obj_to_serialized_state({
+            Board.STATE_KEY_NEXT_PLAYER_TO_ACT:self.player1.id,
+            Board.STATE_KEY_BOARD_LIST:board_list
+        })
+        board = Board.objects.create(
+            game=game, board_state=board_state, board_length_x=7, board_length_y=7, max_to_win=4)
+
+        self.client.login(username='testuser1@mail.com', password='password')
+        url = reverse('api-connectquat-move')
+        data = {'column_index':3}
+        response = self.client.post(url, data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertTrue(response.data['game_over'])
+        self.assertTrue(
+            response.data['winner'],
+            {'handle':self.player1.slug, 'slug':self.player2.slug})
+        self.mock_cycle_player_turn_if_inactive.assert_not_called()
 
 
     def test_player_cant_drop_chip_when_it_isnt_their_turn(self):

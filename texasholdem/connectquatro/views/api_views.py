@@ -15,6 +15,7 @@ from lobby.models import Game, CompletedGame
 from connectquatro import lib as cq_lib
 from connectquatro.forms import ConnectQuatroMoveForm
 from connectquatro.models import Board
+from connectquatro import tasks
 from django.db import transaction
 from texasholdem.utils import get_user_player_game
 
@@ -107,6 +108,8 @@ def make_move(request):
     game_state['active_player'] = False
     if game_state['winner']:
         game_state['player_won'] = game_state['winner']['slug'] == player.slug
+    else:
+        tasks.cycle_player_turn_if_inactive.delay(game.id)
     return Response(game_state, status.HTTP_200_OK)
 
 
