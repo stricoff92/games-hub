@@ -4,7 +4,6 @@ import time
 from texasholdem.celery_conf import app
 
 @app.task
-def cq_task(n):
-    print("cq_task ============================ START")
-    time.sleep(5)
-    print("cq_task ============================ DONE")
+def cycle_player_turn_if_inactive(player, current_tick_count, delay):
+    time.sleep(delay)
+    

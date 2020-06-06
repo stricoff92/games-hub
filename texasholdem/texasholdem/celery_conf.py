@@ -18,10 +18,3 @@ app.config_from_object('django.conf:settings', namespace='CELERY')
 
 # Load task modules from all registered Django app configs.
 app.autodiscover_tasks()
-
-
-@app.task
-def test_task(n):
-    print("test_task ============================ START")
-    time.sleep(10)
-    print("test_task ============================ DONE")

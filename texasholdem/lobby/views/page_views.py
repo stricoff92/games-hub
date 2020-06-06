@@ -9,13 +9,11 @@ from lobby.forms import LoginForm, RegistrationForm
 from lobby.models import Game
 from lobby.utils import random_room_name
 
-from connectquatro.tasks import cq_task
 
 @login_required
 def rooms_page(request):
     """ Serve up the lobby list HTML template.
     """
-    cq_task.delay(2)
 
     user = request.user
     player = user.player
