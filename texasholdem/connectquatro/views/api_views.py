@@ -109,7 +109,7 @@ def make_move(request):
     if game_state['winner']:
         game_state['player_won'] = game_state['winner']['slug'] == player.slug
     else:
-        tasks.cycle_player_turn_if_inactive.delay(game.id)
+        tasks.cycle_player_turn_if_inactive.delay(game.id, game.tick_count)
     return Response(game_state, status.HTTP_200_OK)
 
 
