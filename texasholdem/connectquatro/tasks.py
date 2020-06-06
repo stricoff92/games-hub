@@ -25,7 +25,7 @@ def cycle_player_turn_if_inactive(game_id:int, original_tick_count:int):
     # Player has yet to move. End their turn
     board = game.board
     board, next_player_turn = cq_lib.cycle_player_turn(board)
-    game_state = cq_lib.get_game_state(board)
+    game_state, _ = cq_lib.get_game_state(board)
     cq_lib.alert_game_players_to_new_move(game, game_state)
 
     # Increment tick counter

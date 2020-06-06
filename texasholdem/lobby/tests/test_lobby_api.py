@@ -11,6 +11,7 @@ from lobby import views
 from lobby import lib as lobby_lib
 from connectquatro.models import Board
 from connectquatro import lib as cq_lib
+from connectquatro import tasks as cq_tasks
 
 class TestLobbyTest(APITestCase):
 
@@ -33,6 +34,9 @@ class TestLobbyTest(APITestCase):
         self.mock_alert_game_players_to_new_move = patch.object(
             cq_lib, 'alert_game_players_to_new_move').start()
 
+        self.mock_cycle_player_turn_if_inactive = patch.object(
+            cq_tasks.cycle_player_turn_if_inactive, 'delay').start()
+
     def tearDown(self):
         self.mock_update_lobby_list_add_connect_quatro.stop()
         self.mock_update_lobby_list_remove_game.stop()
@@ -40,6 +44,7 @@ class TestLobbyTest(APITestCase):
         self.mock_push_player_quit_game_event.stop()
         self.mock_update_lobby_list_player_count.stop()
         self.mock_push_player_promoted_to_lobby_leader.stop()
+        self.mock_cycle_player_turn_if_inactive.stop()
     
 
     def test_player_not_in_a_lobby_can_see_the_lobby_list(self):
@@ -239,6 +244,7 @@ class TestLobbyTest(APITestCase):
         
         self.mock_alert_game_lobby_game_started.assert_called_once_with(game)
         self.mock_update_lobby_list_remove_game.assert_called_once_with(game)
+        self.mock_cycle_player_turn_if_inactive.assert_called_once_with(game.id, game.tick_count)
 
 
     def test_player_cannot_start_with_1_player(self):
@@ -261,6 +267,7 @@ class TestLobbyTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.mock_alert_game_lobby_game_started.assert_not_called()
         self.mock_update_lobby_list_remove_game.assert_not_called()
+        self.mock_cycle_player_turn_if_inactive.assert_not_called()
 
 
     def test_player_cant_start_game_if_theyre_not_in_a_game(self):
@@ -286,6 +293,7 @@ class TestLobbyTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.mock_alert_game_lobby_game_started.assert_not_called()
         self.mock_update_lobby_list_remove_game.assert_not_called()
+        self.mock_cycle_player_turn_if_inactive.assert_not_called()
 
 
     def test_player_cant_start_game_if_theyre_not_lobby_owner(self):
@@ -312,6 +320,7 @@ class TestLobbyTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.mock_alert_game_lobby_game_started.assert_not_called()
         self.mock_update_lobby_list_remove_game.assert_not_called()
+        self.mock_cycle_player_turn_if_inactive.assert_not_called()
 
 
     def test_player_can_join_a_lobby_which_then_becomes_full(self):

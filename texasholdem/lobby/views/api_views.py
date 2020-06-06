@@ -20,6 +20,7 @@ from lobby.forms import (
 from lobby import lib as lobby_lib
 from connectquatro import lib as cq_lib
 from connectquatro.models import Board as CQboard
+from connectquatro import tasks as cq_tasks
 
 
 @api_view(['POST'])
@@ -87,6 +88,7 @@ def start_game(request):
 
     if game.game_type == Game.GAME_TYPE_CHOICE_CONNECT_QUAT:
         cq_lib.start_game(game)
+        cq_tasks.cycle_player_turn_if_inactive.delay(game.id, game.tick_count)
     else:
         raise NotImplementedError()
     
