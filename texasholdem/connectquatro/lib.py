@@ -29,6 +29,11 @@ def board_state_to_obj(board:Board) -> str:
 def board_obj_to_serialized_state(board:dict) -> str:
     return json.dumps(board)
 
+def get_active_player_id_from_board(board:Board):
+    board_state = board_state_to_obj(board)
+    return board_state[Board.STATE_KEY_NEXT_PLAYER_TO_ACT]
+
+
 def get_next_player_turn(board:Board):
     game_data = board_state_to_obj(board)
     return game_data[Board.STATE_KEY_NEXT_PLAYER_TO_ACT]
@@ -300,7 +305,6 @@ async def alert_game_lobby_game_started(game):
 
 @async_to_sync
 async def alert_game_players_to_new_move(game, game_state):
-    print("alert_game_players_to_new_move()")
     channel_layer = get_channel_layer()
     await channel_layer.group_send(
         game.channel_layer_name, 
@@ -309,3 +313,13 @@ async def alert_game_players_to_new_move(game, game_state):
             "game_state":game_state,
         })
 
+@async_to_sync
+async def update_count_down_clock(game, player_slug, seconds_left):
+    channel_layer = get_channel_layer()
+    await channel_layer.group_send(
+        game.channel_layer_name, 
+        {
+            "type":"countdown.update",
+            "player_slug":player_slug,
+            "seconds":seconds_left,
+        })

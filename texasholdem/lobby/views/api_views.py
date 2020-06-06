@@ -90,7 +90,9 @@ def start_game(request):
 
     if game.game_type == Game.GAME_TYPE_CHOICE_CONNECT_QUAT:
         cq_lib.start_game(game)
-        cq_tasks.cycle_player_turn_if_inactive.delay(game.id, game.tick_count)
+        active_player_id = cq_lib.get_active_player_id_from_board(game.board)
+        cq_tasks.cycle_player_turn_if_inactive.delay(
+            game.id, active_player_id, game.tick_count)
     else:
         raise NotImplementedError()
     

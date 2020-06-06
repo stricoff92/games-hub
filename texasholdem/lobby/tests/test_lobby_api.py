@@ -250,7 +250,8 @@ class TestLobbyTest(APITestCase):
         
         self.mock_alert_game_lobby_game_started.assert_called_once_with(game)
         self.mock_update_lobby_list_remove_game.assert_called_once_with(game)
-        self.mock_cycle_player_turn_if_inactive.assert_called_once_with(game.id, game.tick_count)
+        active_player_id = cq_lib.get_active_player_id_from_board(game.board)
+        self.mock_cycle_player_turn_if_inactive.assert_called_once_with(game.id, active_player_id, game.tick_count)
 
 
     def test_player_cannot_start_with_1_player(self):

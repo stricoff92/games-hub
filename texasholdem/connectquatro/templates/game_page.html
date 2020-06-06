@@ -24,9 +24,10 @@
         .active-move-modal-content {
             text-align:center;
             background-color: #3b3b3b;
+            z-index: 31; /* Sit on top */
             color:white;
             margin: 15% auto; /* 15% from the top and centered */
-            width: 70%; /* Could be more or less, depending on screen size */
+            width: 80%; /* Could be more or less, depending on screen size */
             border-radius:12px;
             font-size:2rem;
         }
@@ -35,8 +36,12 @@
 
     <!-- Your move modal -->
     <div class="active-move-modal">
-        <div class="active-move-modal-content pt-4 pb-4">
-            <p><stong>It's Your Turn</stong></p>
+        <div class="active-move-modal-content pt-4 pb-4 pl-2 pr-2">
+            <p>
+                <i class="fas fa-bell mr-3"></i>
+                <stong>It's Your Turn</stong>
+                <i class="fas fa-bell ml-3"></i>
+            </p>
         </div>
     </div>
 
@@ -87,6 +92,17 @@
         </div>
 
         <!-- Info Pannel -->
+        <style>
+            .active-timer {
+                color:white;
+                background-color:black;
+                padding-left:4px;
+                padding-right:4px;
+                padding-top:2px;
+                padding-bottom:2px;
+                border-radius: 4px;
+            }
+        </style>
         <div class="card mt-4">
             <div class="card-header">
                 Game Info
@@ -109,6 +125,8 @@
                                 class="fas fa-skull-crossbones ml-1"
                                 style="display:none;">
                             </i>
+                            <span class="player-countdown ml-2" id="player-countdown-{{ p.slug }}">
+                            </span>
                         </span>
                     {% endfor %}
                 </div>
@@ -185,6 +203,21 @@
         function gameIsOver() {
             return $("#outcome-pannel").css("display") !== "none"
         }
+        function formatSeconds(seconds) {
+            let seconds_string = seconds + ""
+            if (seconds_string.length < 2) {
+                seconds_string = "0" + seconds_string
+            }
+            return "0:" + seconds_string
+        }
+        function updateCountDownTimer(eventData) {
+            const seconds = eventData.seconds
+            $(".player-countdown").text("")
+            $(`.player-countdown:not(#player-countdown-${eventData.player_slug})`).removeClass("active-timer")
+            $(`#player-countdown-${eventData.player_slug}`).text(formatSeconds(seconds))
+            $(`#player-countdown-${eventData.player_slug}`).addClass("active-timer")
+        }
+    
         function drawGameState(gameState) {
             console.log("drawing gamestate", gameState)
             // Set jumbotron
@@ -276,6 +309,9 @@
                     switch(eventData.type) {
                         case "game.move":
                             drawGameState(eventData.game_state)
+                            break
+                        case "countdown.update":
+                            updateCountDownTimer(eventData)
                             break
                     }
                 }

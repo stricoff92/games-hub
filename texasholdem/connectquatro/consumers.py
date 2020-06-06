@@ -55,5 +55,10 @@ class ConnectQuatroConsumer(AsyncJsonWebsocketConsumer):
         
         await self.send_json(data)
 
+
     async def player_promoted(self, data):
+        await self.send_json(data)
+    
+
+    async def countdown_update(self, data):
         await self.send_json(data)

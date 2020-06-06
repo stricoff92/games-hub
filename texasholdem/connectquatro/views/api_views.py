@@ -89,7 +89,7 @@ def make_move(request):
             return Response(
                 "illegal move", status.HTTP_400_BAD_REQUEST)
 
-        game.tick_count = F('tick_count') + 1
+        game.tick_count = game.tick_count + 1
         game.save(update_fields=['tick_count'])
 
         board, new_player_to_act = cq_lib.cycle_player_turn(board)
@@ -109,7 +109,7 @@ def make_move(request):
     if game_state['winner']:
         game_state['player_won'] = game_state['winner']['slug'] == player.slug
     else:
-        tasks.cycle_player_turn_if_inactive.delay(game.id, game.tick_count)
+        tasks.cycle_player_turn_if_inactive.delay(game.id, new_player_to_act, game.tick_count)
     return Response(game_state, status.HTTP_200_OK)
 
 
