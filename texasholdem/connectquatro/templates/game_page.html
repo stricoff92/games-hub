@@ -127,7 +127,11 @@
                 </div>
             </div>
             <div class="mt-4" style="display:flex;justify-content:center;">
-                <div class="alert alert-success" style="font-size:2rem;width:100%;text-align:center;">
+                <div
+                    id="winning-player-handle-slot-container"
+                    class="alert alert-success"
+                    style="font-size:2rem;width:100%;text-align:center;"
+                >
                     <strong><span id="winning-player-handle-slot"></span></strong>
                 </div>
             </div>
@@ -221,11 +225,14 @@
 
             if(gameState.game_over) {
                 if(gameState.player_won) {
-                    $("#winning-player-handle-slot").text("You Win!")
+                    $("#winning-player-handle-slot").html(`
+                        <i class="fas fa-trophy mr-2"></i>
+                        VICTORY: ${gameState.winner.handle}
+                        <i class="fas fa-trophy ml-2"></i>`)
                 } else {
-                    // TODO: DEFEAT colors/message
-                    $("#winning-player-handle-slot").text(
-                        `${gameState.winner.handle} Wins`)
+                    $("#winning-player-handle-slot").html(`DEFEAT: ${gameState.winner.handle} Wins`)
+                    $("#winning-player-handle-slot-container").removeClass("alert-success")
+                    $("#winning-player-handle-slot-container").addClass("alert-danger")
                 }
                 $("#outcome-pannel").slideDown()
                 $("#leave-room-btn").removeClass("btn-danger")
