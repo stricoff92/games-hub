@@ -200,7 +200,7 @@ class TestConnectquatroAPI(APITestCase):
         self.assertTrue("illegal move" in response.data)
         self.mock_alert_game_players_to_new_move.assert_not_called()
 
-    def test_active_player_cycles_after_each_move(self):
+    def test_active_player_and_game_tick_count_cycles_after_each_move(self):
         game = Game.objects.create(
             game_type=Game.GAME_TYPE_CHOICE_CONNECT_QUAT, name="fooo", is_started=True, 
             max_players=2)
@@ -229,22 +229,28 @@ class TestConnectquatroAPI(APITestCase):
         response = self.client.post(url, data, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         board.refresh_from_db()
+        game.refresh_from_db()
         board_state = cq_lib.board_state_to_obj(board)
         self.assertEqual(board_state[Board.STATE_KEY_NEXT_PLAYER_TO_ACT], self.player1.id)
+        self.assertEqual(game.tick_count, 1)
 
         self.client.login(username='testuser1@mail.com', password='password')
         response = self.client.post(url, data, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         board.refresh_from_db()
+        game.refresh_from_db()
         board_state = cq_lib.board_state_to_obj(board)
         self.assertEqual(board_state[Board.STATE_KEY_NEXT_PLAYER_TO_ACT], self.player2.id)
+        self.assertEqual(game.tick_count, 2)
 
         self.client.login(username='testuser2@mail.com', password='password')
         response = self.client.post(url, data, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         board.refresh_from_db()
+        game.refresh_from_db()
         board_state = cq_lib.board_state_to_obj(board)
         self.assertEqual(board_state[Board.STATE_KEY_NEXT_PLAYER_TO_ACT], self.player3.id)
+        self.assertEqual(game.tick_count, 3)
 
     def test_player_can_win_game_by_getting_4_in_a_row(self):
         game = Game.objects.create(
