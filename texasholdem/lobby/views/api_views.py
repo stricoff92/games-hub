@@ -20,6 +20,7 @@ from lobby.forms import (
 from lobby import lib as lobby_lib
 from connectquatro import lib as cq_lib
 from connectquatro.models import Board as CQboard
+from connectquatro import tasks as cq_tasks
 
 
 @api_view(['POST'])
@@ -54,9 +55,11 @@ def create_lobby(request):
         board_length_y = cq_form.cleaned_data['boarddimy']
         max_players = cq_form.cleaned_data['boardplayercount']
         max_to_win = cq_form.cleaned_data['boardwincount']
+        max_seconds_per_turn = cq_form.cleaned_data['max_seconds_per_turn']
 
         game = lobby_lib.player_create_connectquat_lobby(
-            player, game_name, board_length_x, board_length_y, max_players, max_to_win, is_public=is_public)
+            player, game_name, board_length_x, board_length_y, max_players, max_to_win,
+            max_seconds_per_turn, is_public=is_public)
         data = {
             'id':game.id,
             'slug':game.slug,
@@ -87,6 +90,9 @@ def start_game(request):
 
     if game.game_type == Game.GAME_TYPE_CHOICE_CONNECT_QUAT:
         cq_lib.start_game(game)
+        active_player_id = cq_lib.get_active_player_id_from_board(game.board)
+        cq_tasks.cycle_player_turn_if_inactive.delay(
+            game.id, active_player_id, game.tick_count)
     else:
         raise NotImplementedError()
     

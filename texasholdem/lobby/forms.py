@@ -47,6 +47,7 @@ class NewConnectQuatroRoomForm(forms.Form):
     boarddimy = forms.IntegerField(required=True)
     boardplayercount = forms.IntegerField(required=True)
     boardwincount = forms.IntegerField(required=True)
+    max_seconds_per_turn = forms.IntegerField(required=True)
 
     def clean(self):
         cleaned_data = super().clean()
@@ -70,5 +71,8 @@ class NewConnectQuatroRoomForm(forms.Form):
 
         if cleaned_data['boardplayercount'] < 2:
             raise forms.ValidationError("boardplayercount too small")
-        
+
+        if cleaned_data['max_seconds_per_turn'] < 10:
+            raise forms.ValidationError("max_seconds_per_turn must be greater than 10")
+
         return cleaned_data

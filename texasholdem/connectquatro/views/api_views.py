@@ -2,6 +2,7 @@
 
 from functools import wraps
 
+from django.db.models import F
 from rest_framework.decorators import (
     api_view,
     permission_classes,
@@ -14,6 +15,7 @@ from lobby.models import Game, CompletedGame
 from connectquatro import lib as cq_lib
 from connectquatro.forms import ConnectQuatroMoveForm
 from connectquatro.models import Board
+from connectquatro import tasks
 from django.db import transaction
 from texasholdem.utils import get_user_player_game
 
@@ -86,6 +88,10 @@ def make_move(request):
                 cq_lib.ColumnOutOfRangeError):
             return Response(
                 "illegal move", status.HTTP_400_BAD_REQUEST)
+
+        game.tick_count = game.tick_count + 1
+        game.save(update_fields=['tick_count'])
+
         board, new_player_to_act = cq_lib.cycle_player_turn(board)
         
         game_over, winning_player = cq_lib.get_game_over_state(board)
@@ -102,6 +108,8 @@ def make_move(request):
     game_state['active_player'] = False
     if game_state['winner']:
         game_state['player_won'] = game_state['winner']['slug'] == player.slug
+    else:
+        tasks.cycle_player_turn_if_inactive.delay(game.id, new_player_to_act, game.tick_count)
     return Response(game_state, status.HTTP_200_OK)
 
 

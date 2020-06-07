@@ -7,6 +7,7 @@ from django.db import transaction
 from channels.layers import get_channel_layer
 
 from connectquatro.models import Board
+from connectquatro import tasks as cq_tasks
 from lobby.models import Player, Game, CompletedGame
 from lobby import lib as lobby_lib
 
@@ -28,6 +29,11 @@ def board_state_to_obj(board:Board) -> str:
 
 def board_obj_to_serialized_state(board:dict) -> str:
     return json.dumps(board)
+
+def get_active_player_id_from_board(board:Board):
+    board_state = board_state_to_obj(board)
+    return board_state[Board.STATE_KEY_NEXT_PLAYER_TO_ACT]
+
 
 def get_next_player_turn(board:Board):
     game_data = board_state_to_obj(board)
@@ -263,10 +269,15 @@ def remove_player_from_active_game(player):
         current_player_turn_id = board_state[Board.STATE_KEY_NEXT_PLAYER_TO_ACT]
         if current_player_turn_id == player.id:
             # Adjust active player turn. Active player just left.
-            current_player_turn_id = players_left.order_by('turn_order').first().id
-            board_state[Board.STATE_KEY_NEXT_PLAYER_TO_ACT] = current_player_turn_id
+            next_turn_player_id = players_left.order_by('turn_order').first().id
+
+            board_state[Board.STATE_KEY_NEXT_PLAYER_TO_ACT] = next_turn_player_id
             board.board_state = board_obj_to_serialized_state(board_state)
             board.save(update_fields=['board_state'])
+            game.tick_count = game.tick_count + 1
+            game.save(update_fields=['tick_count'])
+            cq_tasks.cycle_player_turn_if_inactive.delay(
+                game.id, next_turn_player_id, game.tick_count)
     
     elif players_left_count == 1:
         # 1x player left. End the game
@@ -300,7 +311,6 @@ async def alert_game_lobby_game_started(game):
 
 @async_to_sync
 async def alert_game_players_to_new_move(game, game_state):
-    print("alert_game_players_to_new_move()")
     channel_layer = get_channel_layer()
     await channel_layer.group_send(
         game.channel_layer_name, 
@@ -309,3 +319,13 @@ async def alert_game_players_to_new_move(game, game_state):
             "game_state":game_state,
         })
 
+@async_to_sync
+async def update_count_down_clock(game, player_slug, seconds_left):
+    channel_layer = get_channel_layer()
+    await channel_layer.group_send(
+        game.channel_layer_name, 
+        {
+            "type":"countdown.update",
+            "player_slug":player_slug,
+            "seconds":seconds_left,
+        })
