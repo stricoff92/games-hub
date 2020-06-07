@@ -62,3 +62,7 @@ class ConnectQuatroConsumer(AsyncJsonWebsocketConsumer):
 
     async def countdown_update(self, data):
         await self.send_json(data)
+
+
+    async def new_game_feed_message(self, data):
+        await self.send_json(data)

@@ -11,4 +11,4 @@ from .api_views import start_game
 from .api_views import join_lobby
 from .api_views import leave_lobby
 from .api_views import see_lobbies
-
+from .api_views import see_game_feed_messages

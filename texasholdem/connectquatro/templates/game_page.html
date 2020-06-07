@@ -108,12 +108,12 @@
                 Game Info
             </div>
             <div class="card-body p-2">
-                <div style="display:flex;" class="m-1">
+                <div style="display:flex;flex-wrap:wrap;" class="m-1">
                     Players:
                     {% for p in archived_players %}
                         <span
                             id="player-nametag-{{ p.slug }}"
-                            class="player-nametag badge badge-pill ml-1"
+                            class="player-nametag badge badge-pill ml-1 mb-1"
                             style="background-color:{{ p.color }};color:white;font-size:1.2rem;display:flex;"
                         >
                             <span id="player-nametag-{{ p.slug }}-icon" class="player-nametag-icon mr-2" style="display:none;">
@@ -136,6 +136,73 @@
                 </div>
             </div>
         </div>
+        
+        <!-- GAME FEED -->
+        <div class="card mt-4">
+            <div
+                id="game-feed-card-header"
+                class="card-header"
+                style="display:flex; justify-content:space-between;"
+            >
+                <div>
+                    Game Feed
+                </div>
+                <div id="game-feed-call-to-action-wrapper">
+                    <i>tap to open</i>
+                </div>
+            </div>
+            <div
+                id="game-feed-bubbles"
+                class="card-body p-2"
+                style="height:175px; overflow-y:scroll; display:none;"
+            >
+            </div>
+        </div>
+        <script>
+            function scrollGameFeedMostRecent(){
+                // https://stackoverflow.com/questions/13362/scrolling-overflowed-divs-with-javascript
+                feedBubbles = $("#game-feed-bubbles")[0]
+                const scrollHeight = Math.max(feedBubbles.scrollHeight, feedBubbles.clientHeight);
+                feedBubbles.scrollTop = scrollHeight - feedBubbles.clientHeight;
+            }
+            function elementScrolledToBottom(element) { 
+                return element[0].scrollHeight - element.scrollTop() == element.outerHeight()
+            }
+            function gameFeedIsOpen() {
+                return $("#game-feed-bubbles").css("display") != "none"
+            }
+            $("#game-feed-card-header").click(event =>{
+                if(gameFeedIsOpen()) {
+                    $("#game-feed-bubbles").slideUp()
+                    $("#game-feed-call-to-action-wrapper").html("<i>tap to open</i>")
+                } else {
+                    $("#game-feed-bubbles").slideDown(()=>{
+                        scrollGameFeedMostRecent()
+                    })
+                    $("#game-feed-call-to-action-wrapper").html("close X")
+                }
+            })
+            function addNewGameFeedMessage(eventData, forceScroll=false) {
+                const elementWasScrolled = elementScrolledToBottom($("#game-feed-bubbles"))
+                const nowTime = moment(eventData.created_at).format("h:mm")
+                $("#game-feed-bubbles").append(`
+                    <div class="alert mt-0 mb-0 ml-1 p-0">
+                        <i class="${eventData.font_awesome_classes} mr-1"></i>
+                        ${nowTime}: 
+                        ${eventData.message}
+                    </div>
+                `)
+                if (!forceScroll) {
+                    return
+                }
+                setTimeout(() => {
+                    if(gameFeedIsOpen() && elementWasScrolled) {
+                        scrollGameFeedMostRecent()
+                    }
+                })
+            }
+        </script>
+
         <div id="outcome-pannel" style="display:none;">
             <div class="mt-4" style="display:flex;justify-content:center;">
                 <div class="alert alert-dark" style="font-size:2rem;text-align:center;">
@@ -165,9 +232,6 @@
             .circle-base {
                 border-radius: 50%;
                 behavior: url(PIE.htc);
-            }
-            .drop-chip-btn {
-
             }
         </style>
         <div
@@ -293,7 +357,7 @@
 
         function main() {
             (function(){
-                // Instantiate websocket client for chat
+                // Instantiate websocket client for game alerts
                 const socket = new WebSocket(
                     'ws://' + window.location.host + '/connectquatro/')
                 socket.onerror = err => {
@@ -315,6 +379,9 @@
                             break
                         case "countdown.update":
                             updateCountDownTimer(eventData)
+                            break
+                        case "new.game.feed.message":
+                            addNewGameFeedMessage(eventData, true)
                             break
                     }
                 }
@@ -363,6 +430,16 @@
                 url:"{% url 'api-connectquat-ping' %}",
                 success:data => {
                     drawGameState(data)
+                }
+            })
+
+            $.ajax({
+                type:"GET",
+                url:"api/lobby/game/feed/{{ game.slug }}",
+                success:messages => {
+                    messages.forEach(msg => {
+                        addNewGameFeedMessage(msg, false)
+                    })
                 }
             })
         })
