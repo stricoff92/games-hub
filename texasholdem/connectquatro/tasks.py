@@ -9,6 +9,7 @@ from connectquatro import lib as cq_lib
 from connectquatro.models import Board
 from lobby.models import Game, Player, GameFeedMessage
 from texasholdem.celery_conf import app
+from texasholdem.environment import is_testing
 
 
 @app.task
@@ -17,6 +18,7 @@ def cycle_player_turn_if_inactive(game_id:int, active_player_id:int, original_ti
         After the delay, check if it's still this players turn. If so end
         their turn and cycle to the next player
     """
+    is_testing_env = is_testing()
     game = Game.objects.get(id=game_id)
     player = Player.objects.get(id=active_player_id)
 
@@ -27,7 +29,8 @@ def cycle_player_turn_if_inactive(game_id:int, active_player_id:int, original_ti
             return
         seconds_remaining = max_seconds_per_turn - elapsed_time
         cq_lib.update_count_down_clock(game, player.slug, seconds_remaining)
-        time.sleep(3)
+        if not is_testing_env:
+            time.sleep(3)
     
     game.refresh_from_db()
     if game.tick_count > original_tick_count:
