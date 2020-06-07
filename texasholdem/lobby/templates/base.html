@@ -61,6 +61,20 @@
                 })
             }
         </script>
+        {% if user.is_authenticated %}
+            <div class="container">
+                <div class="mt-2">
+                    <div style="display:flex; justify-content:space-between;">
+                        <div>
+                            hey <a href="#">{{ user.player.handle }}</a>.. not you?  <a href="{% url 'page-lobby-logout' %}">logout</a>
+                        </div>
+                        <div style="font-size:1.2rem;">
+                            <i class="fas fa-crow"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
         {% block 'body' %}
             
         {% endblock %}
