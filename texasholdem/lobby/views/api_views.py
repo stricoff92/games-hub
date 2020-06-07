@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 
-from lobby.models import Game, Player
+from lobby.models import Game, Player, GameFeedMessage
 from lobby.forms import (
     NewConnectQuatroRoomForm,
     GameTypeSelectionForm,
@@ -219,3 +219,22 @@ def see_lobbies(request):
             games[ix]['player_count'] = players[game_id]
 
     return Response(games)
+
+
+@api_view(['get'])
+@permission_classes([IsAuthenticated])
+def see_game_feed_messages(request, slug):
+    user = request.user
+    player = user.player
+    game = get_object_or_404(Game, slug=slug)
+
+    if player not in game.archived_players.all():
+        return Response(
+            "Game not found", status.HTTP_404_BAD_REQUEST)
+    
+    gfm = GameFeedMessage.objects.filter(game=game).order_by("created_at")
+    data = gfm.values("created_at", "message", "message_type", "created_at")
+    for ix, row in enumerate(data):
+        data[ix]['font_awesome_classes'] = GameFeedMessage.MESSAGE_TYPE_TO_FAS_CLASSES[row['message_type']]
+
+    return Response(data)

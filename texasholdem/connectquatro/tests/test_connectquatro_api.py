@@ -9,7 +9,7 @@ from django.urls import reverse
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 
-from lobby.models import Player, Game
+from lobby.models import Player, Game, GameFeedMessage
 from lobby import views
 from connectquatro.models import Board
 from connectquatro import lib as cq_lib
@@ -26,6 +26,8 @@ class TestConnectquatroAPI(APITestCase):
 
         self.mock_alert_game_players_to_new_move = patch.object(
             cq_lib, 'alert_game_players_to_new_move').start()
+        self.mock_push_new_game_feed_message = patch.object(
+            cq_lib, 'push_new_game_feed_message').start()
         
         self.mock_cycle_player_turn_if_inactive = patch.object(
             tasks.cycle_player_turn_if_inactive, 'delay').start()
@@ -102,6 +104,83 @@ class TestConnectquatroAPI(APITestCase):
         self.assertTrue(self.player1.slug in passed_player_slugs)
         self.assertTrue(self.player2.slug in passed_player_slugs)
         self.assertEqual(passed_game_state['next_player_slug'], self.player2.slug)
+
+
+    def test_game_feed_message_is_created_when_player_makes_a_move(self):
+        game = Game.objects.create(
+            game_type=Game.GAME_TYPE_CHOICE_CONNECT_QUAT, name="fooo", is_started=True, 
+            max_players=2)
+        self.player1.game = game
+        self.player2.game = game
+        self.player1.save()
+        self.player2.save()
+        board_state = cq_lib.board_obj_to_serialized_state({
+            Board.STATE_KEY_NEXT_PLAYER_TO_ACT:self.player1.id,
+            Board.STATE_KEY_BOARD_LIST:[[None for i in range(7)] for j in range(7)]
+        })
+        board = Board.objects.create(
+            game=game, board_state=board_state, board_length_x=7, board_length_y=7)
+        
+        self.assertEqual(GameFeedMessage.objects.count(), 0)
+
+        self.client.login(username='testuser1@mail.com', password='password')
+        url = reverse('api-connectquat-move')
+        data = {'column_index':3}
+        response = self.client.post(url, data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertEqual(GameFeedMessage.objects.count(), 1)
+        gfm = GameFeedMessage.objects.first()
+        self.assertEqual(gfm.game, game)
+        self.assertEqual(gfm.message_type, GameFeedMessage.MESSAGE_TYPE_PLAYER_MOVE_DROP_CHIP)
+        self.mock_push_new_game_feed_message.assert_called_once_with(gfm)
+
+
+    def test_game_feed_message_is_generated_when_player_wins(self):
+        game = Game.objects.create(
+            game_type=Game.GAME_TYPE_CHOICE_CONNECT_QUAT, name="fooo", is_started=True, 
+            max_players=2)
+        self.player1.game = game
+        self.player2.game = game
+        self.player1.save()
+        self.player2.save()
+        game.archived_players.set([self.player1, self.player2])
+        p1 = self.player1.id
+        p2 = self.player2.id
+        board_list = [
+            [None, None, None, None, None, None, None],
+            [None, None, None, None, None, None, None],
+            [None, None, None, None, None, None, None],
+            [None, None, None, None, None, None, None],
+            [None, None, p1, p2, None, None, None],
+            [None, p1, p2, p2, None, None, None],
+            [p1, p2, p2, p2, None, None, None],
+        ]
+        board_state = cq_lib.board_obj_to_serialized_state({
+            Board.STATE_KEY_NEXT_PLAYER_TO_ACT:self.player1.id,
+            Board.STATE_KEY_BOARD_LIST:board_list
+        })
+        board = Board.objects.create(
+            game=game, board_state=board_state, board_length_x=7, board_length_y=7, max_to_win=4)
+        self.assertEqual(GameFeedMessage.objects.count(), 0)
+
+        self.client.login(username='testuser1@mail.com', password='password')
+        url = reverse('api-connectquat-move')
+        data = {'column_index':3}
+        response = self.client.post(url, data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['game_over'])
+        self.assertEqual(GameFeedMessage.objects.count(), 2)
+
+        move_gfm = GameFeedMessage.objects.filter(
+            game=game, message_type=GameFeedMessage.MESSAGE_TYPE_PLAYER_MOVE_DROP_CHIP).first()
+        game_over_gfm = GameFeedMessage.objects.filter(
+            game=game, message_type=GameFeedMessage.MESSAGE_TYPE_GAME_STATUS).first()
+        
+        calls = self.mock_push_new_game_feed_message.call_args_list
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[0][0][0], move_gfm)
+        self.assertEqual(calls[1][0][0], game_over_gfm)
 
 
     def test_turn_timeout_task_starts_when_player_makes_non_winning_move(self):

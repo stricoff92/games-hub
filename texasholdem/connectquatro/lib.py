@@ -8,7 +8,7 @@ from channels.layers import get_channel_layer
 
 from connectquatro.models import Board
 from connectquatro import tasks as cq_tasks
-from lobby.models import Player, Game, CompletedGame
+from lobby.models import Player, Game, CompletedGame, GameFeedMessage
 from lobby import lib as lobby_lib
 
 
@@ -259,6 +259,11 @@ def remove_player_from_active_game(player):
     player.is_lobby_owner = False
     player.save(update_fields=['game', 'is_lobby_owner'])
 
+    game_over_gfm = None
+    gfm = GameFeedMessage.objects.create(
+        game=game, message_type=GameFeedMessage.MESSAGE_TYPE_PLAYER_QUIT,
+        message=f"{player.handle} quit")
+
     board = game.board
     board_state = board_state_to_obj(board)
     players_left = game.players.all()
@@ -284,11 +289,19 @@ def remove_player_from_active_game(player):
         game.is_over = True
         game.save()
         cg = CompletedGame.objects.create(game=game)
-        cg.winners.set(game.players.all())
+        last_player = game.players.first()
+        cg.winners.set([last_player])
+
+        game_over_gfm = GameFeedMessage.objects.create(
+            game=game, message_type=GameFeedMessage.MESSAGE_TYPE_GAME_STATUS,
+            message=f"{last_player.handle} wins")
 
     
     game_state, is_over = get_game_state(board)
     alert_game_players_to_new_move(game, game_state)
+    push_new_game_feed_message(gfm)
+    if game_over_gfm:
+        push_new_game_feed_message(game_over_gfm)
 
 
 @transaction.atomic
@@ -328,4 +341,17 @@ async def update_count_down_clock(game, player_slug, seconds_left):
             "type":"countdown.update",
             "player_slug":player_slug,
             "seconds":seconds_left,
+        })
+
+@async_to_sync
+async def push_new_game_feed_message(game_feed_message:GameFeedMessage):
+    channel_layer = get_channel_layer()
+    await channel_layer.group_send(
+        game_feed_message.game.channel_layer_name, 
+        {
+            "type": "new.game.feed.message",
+            "message": game_feed_message.message,
+            "message_type": game_feed_message.message_type,
+            "font_awesome_classes": game_feed_message.font_awesome_classes,
+            "created_at":game_feed_message.created_at.isoformat(),
         })

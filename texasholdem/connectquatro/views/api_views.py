@@ -11,7 +11,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 
-from lobby.models import Game, CompletedGame
+from lobby.models import Game, CompletedGame, GameFeedMessage
 from connectquatro import lib as cq_lib
 from connectquatro.forms import ConnectQuatroMoveForm
 from connectquatro.models import Board
@@ -79,11 +79,12 @@ def make_move(request):
         return Response(form.errors, status.HTTP_400_BAD_REQUEST)
     
     user, player, game = get_user_player_game(request)
+    column_index = form.cleaned_data['column_index']
 
     with transaction.atomic():
         try:
             board = cq_lib.drop_chip(
-                board, player, form.cleaned_data['column_index'])
+                board, player, column_index)
         except (cq_lib.ColumnIsFullError,
                 cq_lib.ColumnOutOfRangeError):
             return Response(
@@ -100,16 +101,31 @@ def make_move(request):
             game.save(update_fields=['is_over'])
             cq = CompletedGame.objects.create(game=game)
             cq.winners.set([winning_player])
+        
+        game_over_gfm = None
+        move_gfm = GameFeedMessage.objects.create(
+            game=game,
+            message_type=GameFeedMessage.MESSAGE_TYPE_PLAYER_MOVE_DROP_CHIP,
+            message=f"{player.handle} dropped in column {column_index + 1}")
+        if game_over:
+            game_over_gfm = GameFeedMessage.objects.create(
+                game=game,
+                message_type=GameFeedMessage.MESSAGE_TYPE_GAME_STATUS,
+                message=f"{winning_player.handle} wins")
     
     game_state, _ = cq_lib.get_game_state(board, player)
-
-    game_state, game_over = cq_lib.get_game_state(board, player)
     cq_lib.alert_game_players_to_new_move(game, game_state)
+
     game_state['active_player'] = False
     if game_state['winner']:
         game_state['player_won'] = game_state['winner']['slug'] == player.slug
     else:
         tasks.cycle_player_turn_if_inactive.delay(game.id, new_player_to_act, game.tick_count)
+
+    cq_lib.push_new_game_feed_message(move_gfm)
+    if game_over_gfm:
+        cq_lib.push_new_game_feed_message(game_over_gfm)
+
     return Response(game_state, status.HTTP_200_OK)
 
 
