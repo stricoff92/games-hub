@@ -13,7 +13,6 @@ class Player(models.Model):
 
     game = models.ForeignKey('lobby.Game', on_delete=models.SET_NULL, related_name="players", blank=True, null=True)
     is_lobby_owner = models.BooleanField(default=False)
-    is_ready = models.BooleanField(default=False)
 
     turn_order = models.IntegerField(blank=True, null=True, default=None)
 
@@ -48,3 +47,7 @@ class Player(models.Model):
 
     def __str__(self):
         return str(self.user)
+    
+    @property
+    def is_ready(self):
+        return self.lobby_status == self.LOBBY_STATUS_READY

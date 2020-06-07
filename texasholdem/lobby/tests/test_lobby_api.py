@@ -19,6 +19,8 @@ class TestLobbyTest(APITestCase):
         self.user1 = User.objects.create_user('testuser1@mail.com', password='password')
         self.player1 = Player.objects.create(user=self.user1, handle="foobar")
 
+        self.mock_push_player_ready_status_update = patch.object(
+            lobby_lib, 'push_player_ready_status_update').start()
         self.mock_update_lobby_list_add_connect_quatro = patch.object(
             lobby_lib, 'update_lobby_list_add_connect_quatro').start()
         self.mock_update_lobby_list_remove_game = patch.object(
@@ -29,6 +31,7 @@ class TestLobbyTest(APITestCase):
             lobby_lib, 'push_player_quit_game_event').start()
         self.mock_push_player_promoted_to_lobby_leader = patch.object(
             lobby_lib, 'push_player_promoted_to_lobby_leader').start()
+
         self.mock_alert_game_lobby_game_started = patch.object(
             cq_lib, 'alert_game_lobby_game_started').start()
         self.mock_alert_game_players_to_new_move = patch.object(
@@ -218,6 +221,7 @@ class TestLobbyTest(APITestCase):
         self.player1.is_lobby_owner = True
         self.player1.save()
         self.player2.game = game
+        self.player2.lobby_status = Player.LOBBY_STATUS_READY
         self.player2.save()
 
         url = reverse("api-lobby-start")
@@ -254,6 +258,32 @@ class TestLobbyTest(APITestCase):
         self.mock_cycle_player_turn_if_inactive.assert_called_once_with(game.id, active_player_id, game.tick_count)
 
 
+    def test_player_cant_start_connect_quatro_with_players_who_are_not_ready(self):
+        """ Test player can start a game with 2+ players.
+        """
+        self.client.login(username='testuser1@mail.com', password='password')
+
+        self.user2 = User.objects.create_user('testuser2@mail.com', password='password')
+        self.player2 = Player.objects.create(user=self.user2, handle="foobar")
+        game = Game.objects.create(
+            game_type=Game.GAME_TYPE_CHOICE_CONNECT_QUAT,
+            name="foo", is_started=False, max_players=2)
+        board = Board.objects.create(
+            game=game, board_length_x=7,board_length_y=7)
+        
+        self.player1.game = game
+        self.player1.is_lobby_owner = True
+        self.player1.save()
+        self.player2.game = game
+        self.player2.lobby_status = Player.LOBBY_STATUS_JOINED
+        self.player2.save()
+
+        url = reverse("api-lobby-start")
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue("Not all players are ready" in response.data)
+
+
     def test_player_cannot_start_with_1_player(self):
         """ Test player cannot start a game if they're the only one in the room
         """
@@ -272,6 +302,7 @@ class TestLobbyTest(APITestCase):
         url = reverse("api-lobby-start")
         response = self.client.post(url)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue("Game needs at least 2 players to start" in response.data)
         self.mock_alert_game_lobby_game_started.assert_not_called()
         self.mock_update_lobby_list_remove_game.assert_not_called()
         self.mock_cycle_player_turn_if_inactive.assert_not_called()
@@ -320,11 +351,13 @@ class TestLobbyTest(APITestCase):
         self.player1.is_lobby_owner = False
         self.player1.save()
         self.player2.game = game
+        self.player2.lobby_status = Player.LOBBY_STATUS_READY
         self.player2.save()
 
         url = reverse("api-lobby-start")
         response = self.client.post(url)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue("Player not lobby owner" in response.data)
         self.mock_alert_game_lobby_game_started.assert_not_called()
         self.mock_update_lobby_list_remove_game.assert_not_called()
         self.mock_cycle_player_turn_if_inactive.assert_not_called()
@@ -852,3 +885,26 @@ class TestLobbyTest(APITestCase):
         self.assertIsNotNone(game.completedgame)
         self.assertEqual(game.completedgame.winners.count(), 1)
         self.assertEqual(game.completedgame.winners.first(), self.player2)
+
+
+    def test_player_can_mark_self_as_ready(self):
+        """ Test player can set their lobby status to "ready"
+        """
+        self.user2 = User.objects.create_user('testuser2@mail.com', password='password')
+        self.player2 = Player.objects.create(user=self.user2, handle="duuude")
+        self.client.login(username='testuser2@mail.com', password='password')
+
+        game = Game.objects.create(
+            game_type=Game.GAME_TYPE_CHOICE_CONNECT_QUAT, name="foo", max_players=3,
+            is_started=False, is_over=False)
+        
+        self.player2.lobby_status = Player.LOBBY_STATUS_JOINED
+        self.player2.game = game
+        self.player2.save(update_fields=['lobby_status', 'game'])
+
+        url = reverse('api-lobby-ready')
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.player2.refresh_from_db()
+        self.assertEqual(self.player2.lobby_status, Player.LOBBY_STATUS_READY)
+        self.mock_push_player_ready_status_update.assert_called_once_with(self.player2)

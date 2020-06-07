@@ -87,6 +87,13 @@ def start_game(request):
     if game.players.count() < 2:
         return Response(
             "Game needs at least 2 players to start", status.HTTP_400_BAD_REQUEST)
+    
+    player_lobby_status = (game.players
+        .filter(is_lobby_owner=False)
+        .values_list("lobby_status", flat=True))
+    if any(pls != Player.LOBBY_STATUS_READY for pls in player_lobby_status):
+        return Response(
+            "Not all players are ready", status.HTTP_400_BAD_REQUEST)
 
     if game.game_type == Game.GAME_TYPE_CHOICE_CONNECT_QUAT:
         cq_lib.start_game(game)
@@ -96,6 +103,27 @@ def start_game(request):
     else:
         raise NotImplementedError()
     
+    return Response({}, status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def player_ready(request):
+    user = request.user
+    player = user.player
+    game = player.game
+
+    if not game:
+        return Response(
+            "Not in a game", status.HTTP_400_BAD_REQUEST)
+    if not game.is_pregame:
+        return Response(
+            "game not in pregame", status.HTTP_400_BAD_REQUEST)
+    if player.lobby_status == Player.LOBBY_STATUS_READY:
+        return Response(
+            "player already ready", status.HTTP_400_BAD_REQUEST)
+    
+    lobby_lib.set_player_lobby_status_to_ready(player)
     return Response({}, status.HTTP_200_OK)
 
 

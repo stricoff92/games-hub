@@ -45,6 +45,10 @@
                     <button id="start-lobby-btn" class="btn btn-success">
                         Start Game
                     </button>
+                {% elif not player.is_ready %}
+                    <button id="player-ready-btn" class="btn btn-success">
+                        Ready
+                    </button>
                 {% endif %}
             </div>
         </div>
@@ -71,6 +75,11 @@
                             class="badge badge-pill badge-dark m-1"
                         >
                             {{ player.handle }}
+                            <i
+                                id="player-ready-icon-{{ player.slug }}"
+                                class="fas fa-check ml-1"
+                                style="{% if not player.is_ready %}display:none;{% endif %}">
+                            </i>
                         </span>
                     {% endif %}
                 {% endfor %}
@@ -95,20 +104,21 @@
 <script>
 
     setTimeout(()=>{
-        console.log(1)
         $("#fade-in-container-1").fadeIn()
     }, 50)
     setTimeout(()=>{
-        console.log(2)
         $("#fade-in-container-2").fadeIn()
     }, 300)
     setTimeout(()=>{
-        console.log(3)
         $("#fade-in-container-3").fadeIn()
     }, 500)
 
     function RemovePlayerFromRoom(eventData) {
         $(`#player-nametag-${eventData.playerSlug}`).remove();
+    }
+    function setPlayerAsReady(eventData) {
+        const playerSlug = eventData.player_slug
+        $(`#player-ready-icon-${playerSlug}`).css("display", "inline-block")
     }
     
     function addPlayerToRoom(eventData) {
@@ -121,6 +131,11 @@
                 class="badge badge-pill badge-dark m-1"
             >
                 ${handle}
+                <i
+                    id="player-ready-icon-${slug}"
+                    class="fas fa-check ml-1"
+                    style="display:none;">
+                </i>
             </span>`)
     }
 
@@ -153,6 +168,9 @@
                     case "player.promoted":
                         location.reload()
                         break
+                    case "player.ready":
+                        setPlayerAsReady(eventData)
+                        break
                     default:
                         throw new Error("not implemented, type " + eventData.type)
                 }
@@ -163,33 +181,50 @@
 
     setTimeout(main)
 
-    $("#leave-room-btn").click(event => {
-        $.ajax({
-            url:"{% url 'api-lobby-leave' %}",
-            type:"POST",
-            success: data => {
-                window.location = "{% url 'page-lobby-list' %}"
-            }
-        })
-    })
-
-    $("#start-lobby-btn").click(event => {
-        $.ajax({
-            url:"{% url 'api-lobby-start' %}",
-            type:"POST",
-            success: data => {},
-            error:resp => {
-                if (resp.status < 500) {
-                    alert(resp.responseText)
-                }
-            }
-        })
-    })
-
     $(document).ready(() => {
         const path = $("#join-game-url-link").text()
         const fullPath = location.origin + path
         $("#join-game-url-link").text(fullPath)
+
+
+        $("#leave-room-btn").click(event => {
+            $.ajax({
+                url:"{% url 'api-lobby-leave' %}",
+                type:"POST",
+                success: data => {
+                    window.location = "{% url 'page-lobby-list' %}"
+                }
+            })
+        })
+
+        $("#start-lobby-btn").click(event => {
+            $.ajax({
+                url:"{% url 'api-lobby-start' %}",
+                type:"POST",
+                success: data => {},
+                error:resp => {
+                    if (resp.status < 500) {
+                        alert(resp.responseText)
+                    }
+                }
+            })
+        })
+
+        $("#player-ready-btn").click(event => {
+            $.ajax({
+                url:"{% url 'api-lobby-ready' %}",
+                type:"POST",
+                success: data => {
+                    $("#player-ready-btn").css("display", "none")
+                },
+                error:resp => {
+                    if (resp.status < 500) {
+                        alert(resp.responseText)
+                    }
+                }
+            })
+        })
+
     })
 
 </script>
