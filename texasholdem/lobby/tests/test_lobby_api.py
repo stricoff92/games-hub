@@ -885,3 +885,25 @@ class TestLobbyTest(APITestCase):
         self.assertIsNotNone(game.completedgame)
         self.assertEqual(game.completedgame.winners.count(), 1)
         self.assertEqual(game.completedgame.winners.first(), self.player2)
+
+
+    def test_player_can_mark_self_as_ready(self):
+        """ Test player can set their lobby status to "ready"
+        """
+        self.user2 = User.objects.create_user('testuser2@mail.com', password='password')
+        self.player2 = Player.objects.create(user=self.user2, handle="duuude")
+        self.client.login(username='testuser2@mail.com', password='password')
+
+        game = Game.objects.create(
+            game_type=Game.GAME_TYPE_CHOICE_CONNECT_QUAT, name="foo", max_players=3,
+            is_started=False, is_over=False)
+        
+        self.player2.lobby_status = Player.LOBBY_STATUS_JOINED
+        self.player2.game = game
+        self.player2.save(update_fields=['lobby_status', 'game'])
+
+        url = reverse('api-lobby-ready')
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.player2.refresh_from_db()
+        self.assertEqual(self.player2.lobby_status, Player.LOBBY_STATUS_READY)
