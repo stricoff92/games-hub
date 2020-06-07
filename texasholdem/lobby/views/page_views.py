@@ -24,7 +24,7 @@ def rooms_page(request):
     data = {
         'game_types':Game.GAME_TYPE_CHOICES,
         'chat_socket_url':'/lobby/chat/',
-        'example_name':ex_room_name
+        'example_name':ex_room_name.title(),
     }
     return render(request, 'lobby_list.html', data)
 
@@ -53,6 +53,7 @@ def game_lobby_page(request, slug):
                 f'Max players: { game.max_players }',
                 f'Chips to win: { board.max_to_win }',
                 f'Board size: { board.board_length_x } x { board.board_length_y }',
+                f'Seconds per turn: { game.max_seconds_per_turn }',
             ]
         }
         return render(request, "game_lobby.html", data)

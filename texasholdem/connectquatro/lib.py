@@ -269,12 +269,15 @@ def remove_player_from_active_game(player):
         current_player_turn_id = board_state[Board.STATE_KEY_NEXT_PLAYER_TO_ACT]
         if current_player_turn_id == player.id:
             # Adjust active player turn. Active player just left.
-            current_player_turn_id = players_left.order_by('turn_order').first().id
-            board_state[Board.STATE_KEY_NEXT_PLAYER_TO_ACT] = current_player_turn_id
+            next_turn_player_id = players_left.order_by('turn_order').first().id
+
+            board_state[Board.STATE_KEY_NEXT_PLAYER_TO_ACT] = next_turn_player_id
             board.board_state = board_obj_to_serialized_state(board_state)
             board.save(update_fields=['board_state'])
+            game.tick_count = game.tick_count + 1
+            game.save(update_fields=['tick_count'])
             cq_tasks.cycle_player_turn_if_inactive.delay(
-                game.id, current_player_turn_id, game.tick_count)
+                game.id, next_turn_player_id, game.tick_count)
     
     elif players_left_count == 1:
         # 1x player left. End the game

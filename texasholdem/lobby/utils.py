@@ -8,7 +8,7 @@ ADJECTIVES = ["codified","colloquial","combat","combined","comely","commissioned
 ANIMALS_LEN = len(ANIMALS)
 ADJECTIVES_LEN = len(ADJECTIVES)
 
-COLLECTIONS = ['game', 'group', 'soiree', 'guild', 'group', 'LLC', 'cohort', 'the musical']
+COLLECTIONS = ['game', 'group', 'soiree', 'guild', 'group', 'LLC', 'cohort', 'the musical', 'consortium', 'syndicate',]
 COLLECTIONS_LEN = len(COLLECTIONS)
 
 def random_room_name():
