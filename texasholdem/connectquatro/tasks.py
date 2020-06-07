@@ -23,7 +23,7 @@ def cycle_player_turn_if_inactive(game_id:int, active_player_id:int, original_ti
     max_seconds_per_turn = game.max_seconds_per_turn
     for elapsed_time in range(0, max_seconds_per_turn, 3):
         game.refresh_from_db()
-        if game.tick_count > original_tick_count:
+        if game.tick_count > original_tick_count or game.is_over:
             return
         seconds_remaining = max_seconds_per_turn - elapsed_time
         cq_lib.update_count_down_clock(game, player.slug, seconds_remaining)

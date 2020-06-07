@@ -230,6 +230,9 @@
                 $("#game-page-header").removeClass("bg-success")
                 $("#game-page-header").addClass("bg-dark")
                 $(".drop-chip-btn").attr("disabled", true);
+                if(modalIsOpen()) {
+                    $(".active-move-modal").css("display", "none")
+                }
             }
             // Add active player turn badge
             const activePlayerSlug = gameState.next_player_slug
