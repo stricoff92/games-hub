@@ -907,3 +907,4 @@ class TestLobbyTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.player2.refresh_from_db()
         self.assertEqual(self.player2.lobby_status, Player.LOBBY_STATUS_READY)
+        self.mock_push_player_ready_status_update.assert_called_once_with(self.player2)
