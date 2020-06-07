@@ -218,7 +218,7 @@ def see_lobbies(request):
             games[ix]['connect_quatro_board'] = cq_boards.get(game_id)
             games[ix]['player_count'] = players[game_id]
 
-    return Response(games)
+    return Response(games, status.HTTP_200_OK)
 
 
 @api_view(['get'])
@@ -230,11 +230,11 @@ def see_game_feed_messages(request, slug):
 
     if player not in game.archived_players.all():
         return Response(
-            "Game not found", status.HTTP_404_BAD_REQUEST)
+            "Game not found", status.HTTP_404_NOT_FOUND)
     
     gfm = GameFeedMessage.objects.filter(game=game).order_by("created_at")
     data = gfm.values("created_at", "message", "message_type", "created_at")
     for ix, row in enumerate(data):
         data[ix]['font_awesome_classes'] = GameFeedMessage.MESSAGE_TYPE_TO_FAS_CLASSES[row['message_type']]
 
-    return Response(data)
+    return Response(data, status.HTTP_200_OK)

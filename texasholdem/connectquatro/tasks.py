@@ -7,7 +7,7 @@ from django.db import transaction
 
 from connectquatro import lib as cq_lib
 from connectquatro.models import Board
-from lobby.models import Game, Player
+from lobby.models import Game, Player, GameFeedMessage
 from texasholdem.celery_conf import app
 
 
@@ -37,13 +37,19 @@ def cycle_player_turn_if_inactive(game_id:int, active_player_id:int, original_ti
     board = game.board
     with transaction.atomic():
         board, next_player_id_turn = cq_lib.cycle_player_turn(board)
-        game_state, _ = cq_lib.get_game_state(board)
-        cq_lib.alert_game_players_to_new_move(game, game_state)
 
         # Increment tick counter
         new_tick_count = original_tick_count + 1
         game.tick_count = new_tick_count
         game.save(update_fields=['tick_count'])
+
+        gfm = GameFeedMessage.objects.create(
+            game=game, message_type=GameFeedMessage.MESSAGE_TYPE_GAME_STATUS,
+            message=f"skipping {player.handle}'s turn")
+
+    game_state, _ = cq_lib.get_game_state(board)
+    cq_lib.alert_game_players_to_new_move(game, game_state)
+    cq_lib.push_new_game_feed_message(gfm)
 
     # Restart task for next player
     cycle_player_turn_if_inactive.delay(game_id, next_player_id_turn, new_tick_count)
