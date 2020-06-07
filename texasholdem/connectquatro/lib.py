@@ -7,6 +7,7 @@ from django.db import transaction
 from channels.layers import get_channel_layer
 
 from connectquatro.models import Board
+from connectquatro import tasks as cq_tasks
 from lobby.models import Player, Game, CompletedGame
 from lobby import lib as lobby_lib
 
@@ -272,6 +273,8 @@ def remove_player_from_active_game(player):
             board_state[Board.STATE_KEY_NEXT_PLAYER_TO_ACT] = current_player_turn_id
             board.board_state = board_obj_to_serialized_state(board_state)
             board.save(update_fields=['board_state'])
+            cq_tasks.cycle_player_turn_if_inactive.delay(
+                game.id, current_player_turn_id, game.tick_count)
     
     elif players_left_count == 1:
         # 1x player left. End the game

@@ -669,7 +669,7 @@ class TestLobbyTest(APITestCase):
         self.mock_update_lobby_list_remove_game.assert_called_once()
 
 
-    def test_player_can_leave_a_started_connect_quatrogame_still_others_left_in_the_game(self):
+    def test_active_player_can_leave_a_started_connect_quatrogame_still_others_left_in_the_game(self):
         """ Test player can leave a started game that will still have > 1 players leftover.
         """
         self.user2 = User.objects.create_user('testuser2@mail.com', password='password')
@@ -700,6 +700,7 @@ class TestLobbyTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         game.refresh_from_db()
+        board.refresh_from_db()
         self.player1.refresh_from_db()
         self.assertTrue(Game.objects.filter(id=game_id).exists())
         self.assertFalse(game.is_over)
@@ -712,6 +713,72 @@ class TestLobbyTest(APITestCase):
         self.mock_update_lobby_list_player_count.assert_not_called()
         self.mock_update_lobby_list_remove_game.assert_not_called()
         self.mock_update_lobby_list_add_connect_quatro.assert_not_called()
+
+        active_player_id = cq_lib.get_active_player_id_from_board(board)
+        self.mock_cycle_player_turn_if_inactive.assert_called_once_with(
+            game.id, active_player_id, game.tick_count)
+
+        calls = self.mock_alert_game_players_to_new_move.call_args_list
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][0][0], game)
+
+        passed_game_state = calls[0][0][1]
+        self.assertFalse(passed_game_state['game_over'])
+        self.assertTrue(
+            passed_game_state['next_player_slug'] in [self.player2.slug], self.player3.slug)
+        self.assertEqual(len(passed_game_state['players']), 2)
+        passed_player_slugs = [p['slug'] for p in passed_game_state['players']]
+        self.assertTrue(self.player2.slug in passed_player_slugs)
+        self.assertTrue(self.player3.slug in passed_player_slugs)
+        self.assertFalse(CompletedGame.objects.filter(game=game).exists())
+
+
+    def test_not_active_player_can_leave_a_started_connect_quatrogame_still_others_left_in_the_game(self):
+        """ Test player can leave a started game that will still have > 1 players leftover.
+        """
+        self.user2 = User.objects.create_user('testuser2@mail.com', password='password')
+        self.player2 = Player.objects.create(user=self.user2, handle="duuude")
+        self.user3 = User.objects.create_user('testuser3@mail.com', password='password')
+        self.player3 = Player.objects.create(user=self.user3, handle="yoo-duuuude")
+
+        game = Game.objects.create(
+            game_type=Game.GAME_TYPE_CHOICE_CONNECT_QUAT, name="foo", max_players=3,
+            is_started=True, is_over=False)
+        board_state = cq_lib.board_obj_to_serialized_state({
+            Board.STATE_KEY_NEXT_PLAYER_TO_ACT:self.player2.id,
+            Board.STATE_KEY_BOARD_LIST:[[None for i in range(7)] for j in range(7)]
+        })
+        board = Board.objects.create(game=game, board_state=board_state)
+        game_id = game.id
+        self.player1.game = game
+        self.player2.game = game
+        self.player3.game = game
+        self.player1.save(update_fields=['game'])
+        self.player2.save(update_fields=['game'])
+        self.player3.save(update_fields=['game'])
+        self.assertEqual(game.players.count(), 3)
+
+        self.client.login(username='testuser1@mail.com', password='password')
+        url = reverse('api-lobby-leave')
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        game.refresh_from_db()
+        board.refresh_from_db()
+        self.player1.refresh_from_db()
+        self.assertTrue(Game.objects.filter(id=game_id).exists())
+        self.assertFalse(game.is_over)
+        self.assertTrue(self.player1 not in game.players.all())
+        self.assertTrue(self.player2 in game.players.all())
+        self.assertTrue(self.player3 in game.players.all())
+        self.assertEqual(game.players.count(), 2)
+
+        self.mock_push_player_quit_game_event.assert_not_called()
+        self.mock_update_lobby_list_player_count.assert_not_called()
+        self.mock_update_lobby_list_remove_game.assert_not_called()
+        self.mock_update_lobby_list_add_connect_quatro.assert_not_called()
+
+        self.mock_cycle_player_turn_if_inactive.assert_not_called()
 
         calls = self.mock_alert_game_players_to_new_move.call_args_list
         self.assertEqual(len(calls), 1)
@@ -767,6 +834,8 @@ class TestLobbyTest(APITestCase):
         self.mock_update_lobby_list_player_count.assert_not_called()
         self.mock_update_lobby_list_remove_game.assert_not_called()
         self.mock_update_lobby_list_add_connect_quatro.assert_not_called()
+
+        self.mock_cycle_player_turn_if_inactive.assert_not_called()
 
         calls = self.mock_alert_game_players_to_new_move.call_args_list
         self.assertEqual(len(calls), 1)
