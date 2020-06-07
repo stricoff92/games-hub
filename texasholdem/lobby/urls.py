@@ -22,6 +22,7 @@ urlpatterns = [
     url(r"api/lobby/create/?$", views.create_lobby, name='api-lobby-create'),
     url(r"api/lobby/start/?$", views.start_game, name='api-lobby-start'),
     url(r"api/lobby/join/(?P<slug>[0-9a-zA-Z]+)/", views.join_lobby, name='api-lobby-join'),
+    url(r"api/lobby/ready/", views.player_ready, name='api-lobby-ready'),
     url(r"api/lobby/leave/?$", views.leave_lobby, name='api-lobby-leave'),
     url(r"api/lobby/list/?$", views.see_lobbies, name='api-lobby-list'),
     url(r"api/lobby/game/feed/(?P<slug>[0-9a-zA-Z]+)/?$", views.see_game_feed_messages, name='api-lobby-game-feed-messages'),

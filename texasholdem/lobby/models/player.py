@@ -48,3 +48,7 @@ class Player(models.Model):
 
     def __str__(self):
         return str(self.user)
+    
+    @property
+    def is_ready(self):
+        return self.lobby_status == self.LOBBY_STATUS_READY

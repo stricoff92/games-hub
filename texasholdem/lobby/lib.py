@@ -7,7 +7,7 @@ from channels.layers import get_channel_layer
 from django.db import transaction
 
 from lobby.consumers import LobbyRoomsConsumer
-from lobby.models import Game
+from lobby.models import Game, Player
 from connectquatro.models import Board
 from connectquatro import lib as cq_lib
 
@@ -48,7 +48,8 @@ def player_create_connectquat_lobby(
 @transaction.atomic
 def player_join_lobby(player, game):
     player.game = game
-    player.save(update_fields=['game'])
+    player.lobby_status = Player.LOBBY_STATUS_JOINED
+    player.save(update_fields=['game', 'lobby_status'])
     alert_game_lobby_player_joined(game, player)
     if game.is_public:
         if game.is_full:
@@ -90,6 +91,13 @@ def player_leave_lobby(player):
             push_player_promoted_to_lobby_leader(new_leader, game)
 
 
+@transaction.atomic
+def set_player_lobby_status_to_ready(player):
+    player.lobby_status = Player.LOBBY_STATUS_READY
+    player.save(update_fields=['lobby_status'])
+    push_player_ready_status_update(player)
+
+
 # async channel layer functions
 
 @async_to_sync
@@ -117,7 +125,6 @@ async def push_player_quit_game_event(game, player):
 
 @async_to_sync
 async def push_player_promoted_to_lobby_leader(player, game):
-    print("push_player_promoted_to_lobby_leader()")
     channel_layer = get_channel_layer()
     await channel_layer.group_send(
         game.channel_layer_name,
@@ -165,5 +172,17 @@ async def update_lobby_list_add_connect_quatro(game, board):
                 'board_length_x':board.board_length_x,
                 'board_length_y':board.board_length_y,
             }
+        }
+    )
+
+@async_to_sync
+async def push_player_ready_status_update(player):
+    channel_layer = get_channel_layer()
+    game = player.game
+    await channel_layer.group_send(
+        game.channel_layer_name,
+        {
+            "type":"player.ready",
+            "player_slug":player.slug,
         }
     )
