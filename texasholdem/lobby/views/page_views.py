@@ -127,3 +127,7 @@ def register(request):
     form = RegistrationForm(request.POST)
 
 
+@login_required
+def player_profile(request):
+    player = request.user.player
+    return render(request, 'player_profile.html', {'player':player})

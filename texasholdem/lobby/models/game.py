@@ -6,6 +6,7 @@ from django.urls import reverse
 
 from .utils import generate_slug
 from lobby.models import Player
+from lobby.models.base import AbstractBaseModel
 
 class GameManager(models.Manager):
     def get_publically_joinable_games(self):
@@ -22,7 +23,7 @@ class GameManager(models.Manager):
         return games.filter(id__in=not_full_game_ids)
             
 
-class Game(models.Model):
+class Game(AbstractBaseModel):
 
     objects = GameManager()
 
