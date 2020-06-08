@@ -1,0 +1,103 @@
+
+{% extends 'base.html' %} 
+{% block 'body' %}
+    <div class="container">
+        <div
+            class="jumbotron pt-2 pb-2 mt-1 bg-dark text-white"
+        >
+            <div style="font-size:2.5rem; text-align:center;">
+                Your Profile
+            </div>
+        </div>
+        <!-- Basic Info -->
+        <div class="card p-2">
+            <div class="card-header pl-2 pt-1 pb-1 mb-2" style="font-size:1.5rem;">
+                Basic Info
+            </div>
+            <div class="card-body p-2" style="font-size:1.3rem;">
+                <p>Your username is <strong>{{ user.username }}</strong></p><hr>
+                <p>Your in game name is <strong>{{ player.handle }}</strong></p><hr>
+                <p>
+                    {% if user.email %}
+                        Your email is <strong>{{ user.email }}</strong>
+                    {% else %}
+                        <i>No email on file</i>
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+        <!-- Match History -->
+        <div class="card p-2 mt-4">
+            <div class="card-header pl-2 pt-1 pb-1 mb-2" style="font-size:1.5rem;">
+                Game History
+            </div>
+            <div class="card-body p-2" >
+
+                <div>
+                    <div id="games-rows">
+
+                    </div>
+                    <div class="mt-4" style="text-align:center;">
+                        <button id="paginate-btn" class="btn btn-primary">
+                            More
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    <script>
+        window.gameHistoryPage = 1
+        $(document).ready(() => {
+            const getGameHistoryBatch = (url, cb) => {
+                $.ajax({
+                    url,
+                    type:"GET",
+                    success: data => {
+                        window.gameHistoryPage++
+                        cb(null, data)
+                    },
+                    error:(v0, v1, v2) => {
+                        cb([v0, v1, v2])
+                    }
+                })
+            }
+            getGameHistoryBatchCb = (errs, data) => {
+                if (errs) {
+                    throw new Error(errs)
+                }
+                if (!data.next) {
+                    $("#paginate-btn").attr("disabled", true)
+                }
+                data.results.forEach(row =>{
+                    let dispayName;
+                    if(row.game_type) {
+                        dispayName = "Connect Quatro"
+                    }
+                    $("#games-rows").append(`
+                        <div class="card pl-3 pr-3 pt-2 pb-2" style="display:flex; flex-direction:row; justify-content:space-between;">
+                            <div>
+                                ${dispayName}
+                            </div>
+                            <div>
+                                ${moment(row.created_at).format("MMM D, YYYY")}
+                            </div>
+                            <div>
+                                ${row.win ? '<span class="badge badge-success">Win</span>' : '<span class="badge badge-danger">Loss</span>'}
+                            </div>
+                        </div>
+                    `)
+                })
+                
+            }
+            function createUrl(page) {
+                return "{% url 'api-lobby-game-history' %}" + `?page=${page}`
+            }
+            getGameHistoryBatch(createUrl(1), getGameHistoryBatchCb)
+            $("#paginate-btn").click(event => {
+                getGameHistoryBatch(createUrl(window.gameHistoryPage), getGameHistoryBatchCb)
+            })
+        })
+    </script>
+{% endblock %}

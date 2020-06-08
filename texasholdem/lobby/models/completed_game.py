@@ -3,10 +3,10 @@ from django.db import models
 
 from .utils import generate_slug
 from lobby.models import Game
-
+from lobby.models.base import AbstractBaseModel
 
         
-class CompletedGame(models.Model):
+class CompletedGame(AbstractBaseModel):
     game = models.OneToOneField(Game, on_delete=models.SET_NULL, null=True)
 
     WINNER_TYPE_DRAW = "<< DRAW >>"

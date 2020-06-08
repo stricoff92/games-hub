@@ -1,5 +1,5 @@
 
-from collections import Counter
+from collections import Counter, defaultdict
 
 from django.shortcuts import get_object_or_404
 from django.db import transaction
@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 
-from lobby.models import Game, Player, GameFeedMessage
+from lobby.models import Game, CompletedGame, Player, GameFeedMessage
 from lobby.forms import (
     NewConnectQuatroRoomForm,
     GameTypeSelectionForm,
@@ -217,7 +217,7 @@ def leave_lobby(request):
     return Response({}, status.HTTP_200_OK)
 
 
-@api_view(['get'])
+@api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def see_lobbies(request):
     user = request.user
@@ -249,7 +249,7 @@ def see_lobbies(request):
     return Response(games, status.HTTP_200_OK)
 
 
-@api_view(['get'])
+@api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def see_game_feed_messages(request, slug):
     user = request.user
@@ -264,5 +264,49 @@ def see_game_feed_messages(request, slug):
     data = gfm.values("created_at", "message", "message_type", "created_at")
     for ix, row in enumerate(data):
         data[ix]['font_awesome_classes'] = GameFeedMessage.MESSAGE_TYPE_TO_FAS_CLASSES[row['message_type']]
+
+    return Response(data, status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def see_game_history(request):
+    try:
+        page = int(request.query_params.get('page', 1))
+    except ValueError:
+        return Response(
+            "invalid type for query parameter 'page'",
+            status.HTTP_400_BAD_REQUEST)
+
+    # Fetch player's games
+    user = request.user
+    player = user.player
+    games = player.archived_games.filter(is_over=True).order_by("-created_at")
+    games_count = games.count()
+
+    # Apply pagination
+    limit = 20
+    start_ix = (page - 1) * limit
+    end_ix = start_ix + limit
+    are_more_games = page * limit < games_count
+    games = games[start_ix:end_ix]
+    
+    games = games.values('id', 'created_at', 'game_type')
+    game_ids = [g['id'] for g in games]
+    completed_games = CompletedGame.objects.filter(game_id__in=game_ids).values("game_id", "winners")
+    game_winners = defaultdict(set)
+    for cg in completed_games:
+        if cg['winners']:
+            game_winners[cg['game_id']].add(cg['winners'])
+
+    for ix, game in enumerate(games):
+        winners = game_winners[game['id']]
+        games[ix]['win'] = player.id in winners
+    
+    data = {
+        'count':games_count,
+        'next':are_more_games,
+        'results':games,
+    }
 
     return Response(data, status.HTTP_200_OK)
